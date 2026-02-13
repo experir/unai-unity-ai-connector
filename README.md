@@ -1,6 +1,11 @@
 # UNAI - Universal AI Connector for Unity
 
-Connect Unity to **any AI provider** with a single, unified API. Use cloud models or local ones - swap providers with one line of code.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](Assets/UnAI/LICENSE)
+[![Unity 6+](https://img.shields.io/badge/Unity-6000.0%2B-black.svg)](https://unity.com)
+
+Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and more — with a single, unified C# API. Use cloud models or run local LLMs. Swap providers with one line of code.
+
+**AI for Unity games, tools, and apps** — chat completions, real-time streaming, async/await, cross-platform (Windows, Mac, Linux, Android, iOS, WebGL).
 
 ## Supported Providers
 
@@ -17,6 +22,26 @@ Connect Unity to **any AI provider** with a single, unified API. Use cloud model
 | **Any OpenAI-compatible API** | Custom | SSE | Optional |
 
 > **Tip:** Providers like **xAI (Grok)**, **DeepSeek**, and **Perplexity** use OpenAI-compatible APIs and work out of the box with the **OpenAI-compatible** provider - just set the base URL and API key.
+
+## Features
+
+- **Unified API** — one interface for all providers, switch with a single line
+- **Real-time streaming** — token-by-token responses on the main thread, perfect for chat UIs
+- **Async/await** — native C# `Task`-based API, no coroutine boilerplate
+- **Cross-platform** — Windows, Mac, Linux, Android, iOS, and WebGL via `UnityWebRequest`
+- **Local AI support** — run models offline with Ollama, LM Studio, or llama.cpp
+- **OpenAI-compatible** — works with any provider that follows the OpenAI API format (xAI Grok, DeepSeek, Perplexity, vLLM, etc.)
+- **Zero dependencies** — only requires Newtonsoft JSON (auto-installed)
+- **Runtime provider switching** — change AI backends on the fly without restarting
+- **ScriptableObject config** — inspector-friendly setup with env var overrides for production
+
+## Use Cases
+
+- NPC dialogue and AI-driven characters in games
+- In-editor AI coding and content generation tools
+- AI-powered game mechanics (procedural quests, adaptive difficulty)
+- Chatbot and virtual assistant apps built in Unity
+- Rapid prototyping with local models, deploying with cloud APIs
 
 ## Installation
 
