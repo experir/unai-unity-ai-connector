@@ -1,0 +1,31 @@
+{
+    "name": "com.unai.universal-ai-connector",
+    "version": "1.0.0",
+    "displayName": "UNAI - Universal AI Connector",
+    "description": "Connect Unity to any AI provider with a unified API. Supports OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, and any OpenAI-compatible endpoint. Features streaming, async/await, and cross-platform support including WebGL.",
+    "unity": "6000.0",
+    "keywords": [
+        "ai",
+        "openai",
+        "anthropic",
+        "gemini",
+        "ollama",
+        "llm",
+        "chatgpt",
+        "claude",
+        "mistral",
+        "cohere",
+        "streaming",
+        "local-ai"
+    ],
+    "author": {
+        "name": "Experir",
+        "url": "https://github.com/experir/unity-unai-universal-ai-connector"
+    },
+    "license": "MIT",
+    "category": "AI",
+    "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.2"
+    },
+    "samples": []
+}
