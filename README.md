@@ -50,7 +50,7 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 In Unity, go to **Window > Package Manager > + > Add package from git URL** and enter:
 
 ```
-https://github.com/experir/unity-unai-universal-ai-connector.git?path=Assets/UnAI
+https://github.com/experir/unai-unity-ai-connector.git?path=Assets/UnAI
 ```
 
 ### Manual
