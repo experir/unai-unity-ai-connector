@@ -101,5 +101,21 @@ InitTestScene*.unity*
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
-# Claude
+# Third-party Unity packages (only UnAI should be tracked)
+/[Aa]ssets/TextMesh Pro/
+/[Aa]ssets/TextMesh Pro.meta
+/[Aa]ssets/Scenes/
+/[Aa]ssets/Scenes.meta
+/[Aa]ssets/Settings/
+/[Aa]ssets/Settings.meta
+/[Aa]ssets/InputSystem*.inputactions
+/[Aa]ssets/InputSystem*.inputactions.meta
+
+# Unity project files
+/Packages/
+/ProjectSettings/
+
+# IDE/Editor
+.vscode/
 /.claude/
+*.slnx
