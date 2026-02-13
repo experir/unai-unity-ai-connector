@@ -13,8 +13,9 @@ namespace UnAI.Providers.Cohere
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
-            new UnaiModelInfo { Id = "command-r-plus", DisplayName = "Command R+", ProviderId = "cohere", MaxContextTokens = 128000 },
-            new UnaiModelInfo { Id = "command-r", DisplayName = "Command R", ProviderId = "cohere", MaxContextTokens = 128000 },
+            new UnaiModelInfo { Id = "command-a-03-2025", DisplayName = "Command A", ProviderId = "cohere", MaxContextTokens = 256000 },
+            new UnaiModelInfo { Id = "command-r-plus-08-2024", DisplayName = "Command R+", ProviderId = "cohere", MaxContextTokens = 128000 },
+            new UnaiModelInfo { Id = "command-r-08-2024", DisplayName = "Command R", ProviderId = "cohere", MaxContextTokens = 128000 },
         };
 
         protected override string BuildRequestUrl(UnaiChatRequest request)

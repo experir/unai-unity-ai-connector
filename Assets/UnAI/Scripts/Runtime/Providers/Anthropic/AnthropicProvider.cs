@@ -16,9 +16,9 @@ namespace UnAI.Providers.Anthropic
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
-            new UnaiModelInfo { Id = "claude-sonnet-4-20250514", DisplayName = "Claude Sonnet 4", ProviderId = "anthropic", MaxContextTokens = 200000 },
-            new UnaiModelInfo { Id = "claude-opus-4-20250514", DisplayName = "Claude Opus 4", ProviderId = "anthropic", MaxContextTokens = 200000 },
-            new UnaiModelInfo { Id = "claude-3-5-haiku-20241022", DisplayName = "Claude 3.5 Haiku", ProviderId = "anthropic", MaxContextTokens = 200000 },
+            new UnaiModelInfo { Id = "claude-opus-4-6", DisplayName = "Claude Opus 4.6", ProviderId = "anthropic", MaxContextTokens = 200000 },
+            new UnaiModelInfo { Id = "claude-sonnet-4-5-20250929", DisplayName = "Claude Sonnet 4.5", ProviderId = "anthropic", MaxContextTokens = 200000 },
+            new UnaiModelInfo { Id = "claude-haiku-4-5-20251001", DisplayName = "Claude Haiku 4.5", ProviderId = "anthropic", MaxContextTokens = 200000 },
         };
 
         protected override string BuildRequestUrl(UnaiChatRequest request)

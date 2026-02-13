@@ -6,15 +6,17 @@ Connect Unity to **any AI provider** with a single, unified API. Use cloud model
 
 | Provider | Type | Streaming | Auth |
 |----------|------|-----------|------|
-| **OpenAI** (GPT-4o, o1, o3) | Cloud | SSE | API Key |
-| **Anthropic** (Claude Sonnet/Opus 4) | Cloud | SSE | API Key |
-| **Google Gemini** (2.0 Flash, 1.5 Pro) | Cloud | SSE | API Key |
-| **Mistral** (Large, Small, Codestral) | Cloud | SSE | API Key |
-| **Cohere** (Command R+) | Cloud | SSE | API Key |
+| **OpenAI** (GPT-5.2, GPT-5, GPT-5 Mini/Nano) | Cloud | SSE | API Key |
+| **Anthropic** (Claude Opus 4.6, Sonnet 4.5, Haiku 4.5) | Cloud | SSE | API Key |
+| **Google Gemini** (3 Pro/Flash, 2.5 Pro/Flash) | Cloud | SSE | API Key |
+| **Mistral** (Large, Medium, Small, Codestral, Devstral) | Cloud | SSE | API Key |
+| **Cohere** (Command A, Command R/R+) | Cloud | SSE | API Key |
 | **Ollama** | Local | NDJSON | None |
 | **LM Studio** | Local | SSE | None |
 | **llama.cpp** | Local | SSE | None |
 | **Any OpenAI-compatible API** | Custom | SSE | Optional |
+
+> **Tip:** Providers like **xAI (Grok)**, **DeepSeek**, and **Perplexity** use OpenAI-compatible APIs and work out of the box with the **OpenAI-compatible** provider - just set the base URL and API key.
 
 ## Installation
 
@@ -104,7 +106,7 @@ UnaiManager.Instance.SetActiveProvider("openai");    // cloud
 var claude = UnaiProviderRegistry.Get("anthropic");
 var response = await claude.ChatAsync(new UnaiChatRequest
 {
-    Model = "claude-sonnet-4-20250514",
+    Model = "claude-sonnet-4-5-20250929",
     Messages = new() { UnaiChatMessage.User("Hello Claude!") }
 });
 ```

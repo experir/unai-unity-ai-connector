@@ -11,8 +11,10 @@ namespace UnAI.Providers.Mistral
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
             new UnaiModelInfo { Id = "mistral-large-latest", DisplayName = "Mistral Large", ProviderId = "mistral", MaxContextTokens = 128000 },
+            new UnaiModelInfo { Id = "mistral-medium-latest", DisplayName = "Mistral Medium", ProviderId = "mistral", MaxContextTokens = 128000 },
             new UnaiModelInfo { Id = "mistral-small-latest", DisplayName = "Mistral Small", ProviderId = "mistral", MaxContextTokens = 128000 },
             new UnaiModelInfo { Id = "codestral-latest", DisplayName = "Codestral", ProviderId = "mistral", MaxContextTokens = 256000 },
+            new UnaiModelInfo { Id = "devstral-2-25-12", DisplayName = "Devstral 2", ProviderId = "mistral", MaxContextTokens = 128000 },
         };
 
         protected override bool ValidateConfig()

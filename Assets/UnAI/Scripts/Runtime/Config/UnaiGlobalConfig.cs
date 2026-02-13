@@ -19,7 +19,7 @@ namespace UnAI.Config
             ProviderId = "openai",
             BaseUrl = "https://api.openai.com",
             ApiKeyEnvironmentVariable = "OPENAI_API_KEY",
-            DefaultModel = "gpt-4o"
+            DefaultModel = "gpt-5.2"
         };
 
         public UnaiProviderConfig Anthropic = new()
@@ -27,7 +27,7 @@ namespace UnAI.Config
             ProviderId = "anthropic",
             BaseUrl = "https://api.anthropic.com",
             ApiKeyEnvironmentVariable = "ANTHROPIC_API_KEY",
-            DefaultModel = "claude-sonnet-4-20250514"
+            DefaultModel = "claude-sonnet-4-5-20250929"
         };
 
         public UnaiProviderConfig Gemini = new()
@@ -35,7 +35,7 @@ namespace UnAI.Config
             ProviderId = "gemini",
             BaseUrl = "https://generativelanguage.googleapis.com",
             ApiKeyEnvironmentVariable = "GEMINI_API_KEY",
-            DefaultModel = "gemini-2.0-flash"
+            DefaultModel = "gemini-2.5-flash"
         };
 
         public UnaiProviderConfig Mistral = new()
@@ -51,7 +51,7 @@ namespace UnAI.Config
             ProviderId = "cohere",
             BaseUrl = "https://api.cohere.com",
             ApiKeyEnvironmentVariable = "COHERE_API_KEY",
-            DefaultModel = "command-r-plus"
+            DefaultModel = "command-a-03-2025"
         };
 
         [Header("Local Providers")]

@@ -13,9 +13,11 @@ namespace UnAI.Providers.Gemini
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
-            new UnaiModelInfo { Id = "gemini-2.0-flash", DisplayName = "Gemini 2.0 Flash", ProviderId = "gemini", MaxContextTokens = 1048576 },
-            new UnaiModelInfo { Id = "gemini-2.0-flash-lite", DisplayName = "Gemini 2.0 Flash Lite", ProviderId = "gemini", MaxContextTokens = 1048576 },
-            new UnaiModelInfo { Id = "gemini-1.5-pro", DisplayName = "Gemini 1.5 Pro", ProviderId = "gemini", MaxContextTokens = 2097152 },
+            new UnaiModelInfo { Id = "gemini-2.5-flash", DisplayName = "Gemini 2.5 Flash", ProviderId = "gemini", MaxContextTokens = 1048576 },
+            new UnaiModelInfo { Id = "gemini-2.5-flash-lite", DisplayName = "Gemini 2.5 Flash Lite", ProviderId = "gemini", MaxContextTokens = 1048576 },
+            new UnaiModelInfo { Id = "gemini-2.5-pro", DisplayName = "Gemini 2.5 Pro", ProviderId = "gemini", MaxContextTokens = 1048576 },
+            new UnaiModelInfo { Id = "gemini-3-pro-preview", DisplayName = "Gemini 3 Pro (Preview)", ProviderId = "gemini", MaxContextTokens = 1048576 },
+            new UnaiModelInfo { Id = "gemini-3-flash-preview", DisplayName = "Gemini 3 Flash (Preview)", ProviderId = "gemini", MaxContextTokens = 1048576 },
         };
 
         protected override string BuildRequestUrl(UnaiChatRequest request)
