@@ -1,6 +1,6 @@
 # UNAI - Universal AI Connector for Unity
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](Assets/UnAI/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Unity 6+](https://img.shields.io/badge/Unity-6000.0%2B-black.svg)](https://unity.com)
 
 Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and more — with a single, unified C# API. Use cloud models or run local LLMs. Swap providers with one line of code.
@@ -50,12 +50,12 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 In Unity, go to **Window > Package Manager > + > Add package from git URL** and enter:
 
 ```
-https://github.com/experir/unai-unity-ai-connector.git?path=Assets/UnAI
+https://github.com/experir/unai-unity-ai-connector.git
 ```
 
 ### Manual
 
-Clone this repo and copy the `Assets/UnAI` folder into your project's `Assets` directory.
+Clone this repo into your project's `Packages` directory (e.g. `Packages/com.unai.universal-ai-connector`).
 
 ## Quick Start
 
@@ -185,4 +185,4 @@ API key resolution order:
 
 ## License
 
-MIT - see [LICENSE](Assets/UnAI/LICENSE). Use it however you want, just keep the copyright notice.
+MIT - see [LICENSE](LICENSE). Use it however you want, just keep the copyright notice.
