@@ -17,7 +17,8 @@ namespace UnAI.Http
                 {
                     var go = new GameObject("[UNAI CoroutineRunner]");
                     go.hideFlags = HideFlags.HideAndDontSave;
-                    Object.DontDestroyOnLoad(go);
+                    if (Application.isPlaying)
+                        Object.DontDestroyOnLoad(go);
                     _instance = go.AddComponent<Runner>();
                 }
                 return _instance;

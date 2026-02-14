@@ -146,11 +146,12 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "create_gameobject",
-            Description = "Create a new GameObject in the scene with optional position and components. Supports Undo.",
+            Description = "Create a new GameObject in the scene. Use 'primitive' for visible objects (Cube, Sphere, Capsule, Cylinder, Plane, Quad). Supports Undo.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
                 ""properties"": {
                     ""name"": { ""type"": ""string"", ""description"": ""Name for the new GameObject"" },
+                    ""primitive"": { ""type"": ""string"", ""enum"": [""Cube"", ""Sphere"", ""Capsule"", ""Cylinder"", ""Plane"", ""Quad""], ""description"": ""Create as a primitive with mesh and collider. Use this for any visible object."" },
                     ""parent"": { ""type"": ""string"", ""description"": ""Name of parent GameObject (optional)"" },
                     ""position"": {
                         ""type"": ""object"",
@@ -161,10 +162,19 @@ namespace UnAI.Editor.Assistant
                         },
                         ""description"": ""World position""
                     },
+                    ""scale"": {
+                        ""type"": ""object"",
+                        ""properties"": {
+                            ""x"": { ""type"": ""number"" },
+                            ""y"": { ""type"": ""number"" },
+                            ""z"": { ""type"": ""number"" }
+                        },
+                        ""description"": ""Local scale""
+                    },
                     ""components"": {
                         ""type"": ""array"",
                         ""items"": { ""type"": ""string"" },
-                        ""description"": ""Component type names to add (e.g. ['BoxCollider', 'Rigidbody'])""
+                        ""description"": ""Additional component type names to add (e.g. ['Rigidbody'])""
                     }
                 },
                 ""required"": [""name""]
@@ -174,7 +184,18 @@ namespace UnAI.Editor.Assistant
         protected override string Execute(JObject args)
         {
             string name = args["name"]?.ToString() ?? "New GameObject";
-            var go = new GameObject(name);
+            string primitive = args["primitive"]?.ToString();
+
+            GameObject go;
+            if (!string.IsNullOrEmpty(primitive) && Enum.TryParse<PrimitiveType>(primitive, true, out var primType))
+            {
+                go = GameObject.CreatePrimitive(primType);
+                go.name = name;
+            }
+            else
+            {
+                go = new GameObject(name);
+            }
             Undo.RegisterCreatedObjectUndo(go, $"Create {name}");
 
             // Set parent
@@ -196,6 +217,16 @@ namespace UnAI.Editor.Assistant
                 go.transform.position = new Vector3(x, y, z);
             }
 
+            // Set scale
+            var scale = args["scale"];
+            if (scale != null)
+            {
+                float sx = scale["x"]?.Value<float>() ?? 1;
+                float sy = scale["y"]?.Value<float>() ?? 1;
+                float sz = scale["z"]?.Value<float>() ?? 1;
+                go.transform.localScale = new Vector3(sx, sy, sz);
+            }
+
             // Add components
             var components = args["components"] as JArray;
             if (components != null)
@@ -204,14 +235,16 @@ namespace UnAI.Editor.Assistant
                 {
                     string typeName = comp.ToString();
                     var type = FindComponentType(typeName);
-                    if (type != null)
+                    if (type != null && go.GetComponent(type) == null)
                         Undo.AddComponent(go, type);
                 }
             }
 
             var sb = new StringBuilder();
             sb.AppendLine($"Created GameObject '{go.name}'");
+            if (!string.IsNullOrEmpty(primitive)) sb.AppendLine($"  Primitive: {primitive}");
             sb.AppendLine($"  Position: {go.transform.position}");
+            sb.AppendLine($"  Scale: {go.transform.localScale}");
             sb.AppendLine($"  Components: {string.Join(", ", go.GetComponents<Component>().Select(c => c.GetType().Name))}");
             return sb.ToString();
         }

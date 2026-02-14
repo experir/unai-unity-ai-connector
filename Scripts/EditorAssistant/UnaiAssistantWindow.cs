@@ -172,6 +172,21 @@ namespace UnAI.Editor.Assistant
 
         private void DrawToolbar()
         {
+            // Config row
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUILayout.LabelField("Config:", GUILayout.Width(45));
+            EditorGUI.BeginChangeCheck();
+            _config = (UnaiGlobalConfig)EditorGUILayout.ObjectField(
+                _config, typeof(UnaiGlobalConfig), false, GUILayout.MinWidth(120));
+            if (EditorGUI.EndChangeCheck())
+            {
+                RefreshProviderList();
+                ResetAgent();
+            }
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+
+            // Provider / model row
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
             // Provider selector

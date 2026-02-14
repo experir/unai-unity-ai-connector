@@ -114,8 +114,7 @@ namespace UnAI.Agent
                 // For non-native-tool providers, try parsing text-based tool calls
                 if (toolCalls == null && !_provider.SupportsToolCalling && hasTools)
                 {
-                    if (UnaiToolSerializer.TryParseTextToolCall(response.Content, out var textCall))
-                        toolCalls = new List<UnaiToolCall> { textCall };
+                    toolCalls = UnaiToolSerializer.ParseTextToolCalls(response.Content);
                 }
 
                 List<UnaiToolResult> toolResults = null;

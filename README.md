@@ -64,6 +64,24 @@ https://github.com/experir/unai-unity-ai-connector.git
 
 Clone this repo into your project's `Packages` directory (e.g. `Packages/com.unai.universal-ai-connector`).
 
+### Installing Newtonsoft JSON
+
+UNAI requires **Newtonsoft JSON** (`com.unity.nuget.newtonsoft-json`). It is usually installed automatically, but if you get compile errors about missing `Newtonsoft.Json`, install it manually:
+
+1. Open **Window > Package Manager**
+2. Click **+ > Add package by name**
+3. Enter `com.unity.nuget.newtonsoft-json` and click **Add**
+
+Alternatively, add it directly to your `Packages/manifest.json`:
+
+```json
+{
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}
+```
+
 ## Quick Start
 
 ### 1. Create a config
