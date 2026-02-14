@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Streaming;
+using UnAI.Tools;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace UnAI.Providers.Gemini
@@ -10,6 +12,7 @@ namespace UnAI.Providers.Gemini
     {
         public override string ProviderId => "gemini";
         public override string DisplayName => "Google Gemini";
+        public override bool SupportsToolCalling => true;
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
@@ -54,6 +57,44 @@ namespace UnAI.Providers.Gemini
                     continue;
                 }
 
+                if (msg.Role == UnaiRole.Tool)
+                {
+                    contents.Add(new JObject
+                    {
+                        ["role"] = "user",
+                        ["parts"] = new JArray(new JObject
+                        {
+                            ["functionResponse"] = new JObject
+                            {
+                                ["name"] = msg.ToolName,
+                                ["response"] = new JObject { ["result"] = msg.Content }
+                            }
+                        })
+                    });
+                    continue;
+                }
+
+                if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
+                {
+                    var parts = new JArray();
+                    if (!string.IsNullOrEmpty(msg.Content))
+                        parts.Add(new JObject { ["text"] = msg.Content });
+
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        parts.Add(new JObject
+                        {
+                            ["functionCall"] = new JObject
+                            {
+                                ["name"] = tc.ToolName,
+                                ["args"] = JObject.Parse(tc.ArgumentsJson ?? "{}")
+                            }
+                        });
+                    }
+                    contents.Add(new JObject { ["role"] = "model", ["parts"] = parts });
+                    continue;
+                }
+
                 string role = msg.Role == UnaiRole.User ? "user" : "model";
                 contents.Add(new JObject
                 {
@@ -72,6 +113,24 @@ namespace UnAI.Providers.Gemini
                 };
             }
 
+            if (request.Tools is { Count: > 0 })
+            {
+                var declarations = new JArray();
+                foreach (var tool in request.Tools)
+                {
+                    declarations.Add(new JObject
+                    {
+                        ["name"] = tool.Name,
+                        ["description"] = tool.Description,
+                        ["parameters"] = tool.ParametersSchema ?? new JObject { ["type"] = "object" }
+                    });
+                }
+                obj["tools"] = new JArray(new JObject
+                {
+                    ["functionDeclarations"] = declarations
+                });
+            }
+
             var genConfig = new JObject();
             if (request.Options?.Temperature.HasValue == true)
                 genConfig["temperature"] = request.Options.Temperature.Value;
@@ -85,14 +144,38 @@ namespace UnAI.Providers.Gemini
             if (genConfig.Count > 0)
                 obj["generationConfig"] = genConfig;
 
-            return obj.ToString(Newtonsoft.Json.Formatting.None);
+            return obj.ToString(Formatting.None);
         }
 
         protected override UnaiChatResponse DeserializeResponse(string json)
         {
             var root = JObject.Parse(json);
             var candidate = root["candidates"]?[0];
-            string text = candidate?["content"]?["parts"]?[0]?["text"]?.ToString() ?? "";
+            var parts = candidate?["content"]?["parts"] as JArray;
+
+            string text = "";
+            List<UnaiToolCall> toolCalls = null;
+
+            if (parts != null)
+            {
+                foreach (var part in parts)
+                {
+                    if (part["text"] != null)
+                    {
+                        text += part["text"].ToString();
+                    }
+                    else if (part["functionCall"] is JObject fc)
+                    {
+                        toolCalls ??= new List<UnaiToolCall>();
+                        toolCalls.Add(new UnaiToolCall
+                        {
+                            Id = $"gemini_{System.Guid.NewGuid():N}".Substring(0, 16),
+                            ToolName = fc["name"]?.ToString(),
+                            ArgumentsJson = fc["args"]?.ToString(Formatting.None) ?? "{}"
+                        });
+                    }
+                }
+            }
 
             return new UnaiChatResponse
             {
@@ -100,6 +183,7 @@ namespace UnAI.Providers.Gemini
                 Role = UnaiRole.Assistant,
                 Model = "",
                 FinishReason = candidate?["finishReason"]?.ToString(),
+                ToolCalls = toolCalls,
                 Usage = ParseGeminiUsage(root["usageMetadata"])
             };
         }

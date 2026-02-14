@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Newtonsoft.Json;
+using UnAI.Tools;
 
 namespace UnAI.Models
 {
@@ -28,5 +30,11 @@ namespace UnAI.Models
 
         [JsonIgnore]
         public bool WasStreamed { get; set; }
+
+        [JsonProperty("toolCalls", NullValueHandling = NullValueHandling.Ignore)]
+        public List<UnaiToolCall> ToolCalls { get; set; }
+
+        [JsonIgnore]
+        public bool HasToolCalls => ToolCalls != null && ToolCalls.Count > 0;
     }
 }

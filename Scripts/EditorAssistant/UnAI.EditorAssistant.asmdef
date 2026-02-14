@@ -1,12 +1,13 @@
 {
-    "name": "UnAI.Examples",
-    "rootNamespace": "UnAI.Examples",
+    "name": "UnAI.EditorAssistant",
+    "rootNamespace": "UnAI.Editor.Assistant",
     "references": [
         "UnAI.Runtime",
-        "UnAI.Agent",
-        "Unity.TextMeshPro"
+        "UnAI.Agent"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

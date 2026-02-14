@@ -13,6 +13,7 @@ namespace UnAI.Core
         string DisplayName { get; }
         bool IsConfigured { get; }
         IReadOnlyList<UnaiModelInfo> KnownModels { get; }
+        bool SupportsToolCalling { get; }
 
         void Initialize(UnaiProviderConfig config);
 

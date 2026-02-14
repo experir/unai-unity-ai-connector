@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using UnAI.Tools;
 
 namespace UnAI.Models
 {
@@ -17,5 +18,8 @@ namespace UnAI.Models
 
         [JsonIgnore]
         public bool Stream { get; set; }
+
+        [JsonIgnore]
+        public List<UnaiToolDefinition> Tools { get; set; }
     }
 }

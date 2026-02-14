@@ -3,6 +3,8 @@ using System.Linq;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Streaming;
+using UnAI.Tools;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace UnAI.Providers.Anthropic
@@ -11,6 +13,7 @@ namespace UnAI.Providers.Anthropic
     {
         public override string ProviderId => "anthropic";
         public override string DisplayName => "Anthropic Claude";
+        public override bool SupportsToolCalling => true;
 
         private const string AnthropicVersion = "2023-06-01";
 
@@ -49,14 +52,67 @@ namespace UnAI.Providers.Anthropic
             if (systemMsg != null)
                 obj["system"] = systemMsg.Content;
 
+            if (request.Tools is { Count: > 0 })
+            {
+                var toolsArray = new JArray();
+                foreach (var tool in request.Tools)
+                {
+                    toolsArray.Add(new JObject
+                    {
+                        ["name"] = tool.Name,
+                        ["description"] = tool.Description,
+                        ["input_schema"] = tool.ParametersSchema ?? new JObject { ["type"] = "object" }
+                    });
+                }
+                obj["tools"] = toolsArray;
+            }
+
             var messages = new JArray();
             foreach (var msg in request.Messages.Where(m => m.Role != UnaiRole.System))
             {
-                messages.Add(new JObject
+                if (msg.Role == UnaiRole.Tool)
                 {
-                    ["role"] = msg.Role == UnaiRole.User ? "user" : "assistant",
-                    ["content"] = msg.Content
-                });
+                    messages.Add(new JObject
+                    {
+                        ["role"] = "user",
+                        ["content"] = new JArray(new JObject
+                        {
+                            ["type"] = "tool_result",
+                            ["tool_use_id"] = msg.ToolCallId,
+                            ["content"] = msg.Content
+                        })
+                    });
+                }
+                else if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
+                {
+                    var contentBlocks = new JArray();
+                    if (!string.IsNullOrEmpty(msg.Content))
+                        contentBlocks.Add(new JObject { ["type"] = "text", ["text"] = msg.Content });
+
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        contentBlocks.Add(new JObject
+                        {
+                            ["type"] = "tool_use",
+                            ["id"] = tc.Id,
+                            ["name"] = tc.ToolName,
+                            ["input"] = JObject.Parse(tc.ArgumentsJson ?? "{}")
+                        });
+                    }
+                    messages.Add(new JObject
+                    {
+                        ["role"] = "assistant",
+                        ["content"] = contentBlocks
+                    });
+                }
+                else
+                {
+                    messages.Add(new JObject
+                    {
+                        ["role"] = msg.Role == UnaiRole.User ? "user" : "assistant",
+                        ["content"] = msg.Content
+                    });
+                }
             }
             obj["messages"] = messages;
 
@@ -70,7 +126,7 @@ namespace UnAI.Providers.Anthropic
                     obj["stop_sequences"] = JArray.FromObject(request.Options.StopSequences);
             }
 
-            return obj.ToString(Newtonsoft.Json.Formatting.None);
+            return obj.ToString(Formatting.None);
         }
 
         protected override UnaiChatResponse DeserializeResponse(string json)
@@ -78,12 +134,27 @@ namespace UnAI.Providers.Anthropic
             var root = JObject.Parse(json);
 
             string content = "";
+            List<UnaiToolCall> toolCalls = null;
+
             if (root["content"] is JArray contentArray)
             {
                 foreach (var block in contentArray)
                 {
-                    if (block["type"]?.ToString() == "text")
+                    string type = block["type"]?.ToString();
+                    if (type == "text")
+                    {
                         content += block["text"]?.ToString() ?? "";
+                    }
+                    else if (type == "tool_use")
+                    {
+                        toolCalls ??= new List<UnaiToolCall>();
+                        toolCalls.Add(new UnaiToolCall
+                        {
+                            Id = block["id"]?.ToString(),
+                            ToolName = block["name"]?.ToString(),
+                            ArgumentsJson = block["input"]?.ToString(Formatting.None) ?? "{}"
+                        });
+                    }
                 }
             }
 
@@ -96,6 +167,7 @@ namespace UnAI.Providers.Anthropic
                 Role = UnaiRole.Assistant,
                 Model = root["model"]?.ToString(),
                 FinishReason = root["stop_reason"]?.ToString(),
+                ToolCalls = toolCalls,
                 Usage = new UnaiUsageInfo
                 {
                     PromptTokens = inputTokens,

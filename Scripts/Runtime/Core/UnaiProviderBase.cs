@@ -15,6 +15,7 @@ namespace UnAI.Core
         public abstract string ProviderId { get; }
         public abstract string DisplayName { get; }
         public virtual IReadOnlyList<UnaiModelInfo> KnownModels => Array.Empty<UnaiModelInfo>();
+        public virtual bool SupportsToolCalling => false;
 
         protected UnaiProviderConfig Config { get; private set; }
 

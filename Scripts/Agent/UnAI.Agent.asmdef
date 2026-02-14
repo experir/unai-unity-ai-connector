@@ -1,10 +1,8 @@
 {
-    "name": "UnAI.Examples",
-    "rootNamespace": "UnAI.Examples",
+    "name": "UnAI.Agent",
+    "rootNamespace": "",
     "references": [
-        "UnAI.Runtime",
-        "UnAI.Agent",
-        "Unity.TextMeshPro"
+        "UnAI.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

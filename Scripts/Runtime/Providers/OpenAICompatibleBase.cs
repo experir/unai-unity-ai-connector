@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Streaming;
+using UnAI.Tools;
 using UnAI.Utilities;
 using Newtonsoft.Json.Linq;
 
@@ -10,6 +11,8 @@ namespace UnAI.Providers
     public abstract class OpenAICompatibleBase : UnaiProviderBase
     {
         protected virtual string ChatEndpointPath => "/v1/chat/completions";
+
+        public override bool SupportsToolCalling => true;
 
         protected override string BuildRequestUrl(UnaiChatRequest request)
         {
@@ -48,6 +51,25 @@ namespace UnAI.Providers
                 ["messages"] = SerializeMessages(request.Messages)
             };
 
+            if (request.Tools is { Count: > 0 })
+            {
+                var toolsArray = new JArray();
+                foreach (var tool in request.Tools)
+                {
+                    toolsArray.Add(new JObject
+                    {
+                        ["type"] = "function",
+                        ["function"] = new JObject
+                        {
+                            ["name"] = tool.Name,
+                            ["description"] = tool.Description,
+                            ["parameters"] = tool.ParametersSchema ?? new JObject { ["type"] = "object" }
+                        }
+                    });
+                }
+                obj["tools"] = toolsArray;
+            }
+
             if (request.Options != null)
             {
                 if (request.Options.Temperature.HasValue)
@@ -74,11 +96,49 @@ namespace UnAI.Providers
             var arr = new JArray();
             foreach (var msg in messages)
             {
-                arr.Add(new JObject
+                if (msg.Role == UnaiRole.Tool)
                 {
-                    ["role"] = msg.Role.ToString().ToLowerInvariant(),
-                    ["content"] = msg.Content
-                });
+                    arr.Add(new JObject
+                    {
+                        ["role"] = "tool",
+                        ["tool_call_id"] = msg.ToolCallId,
+                        ["content"] = msg.Content
+                    });
+                }
+                else if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
+                {
+                    var msgObj = new JObject
+                    {
+                        ["role"] = "assistant"
+                    };
+                    if (!string.IsNullOrEmpty(msg.Content))
+                        msgObj["content"] = msg.Content;
+
+                    var toolCallsArr = new JArray();
+                    foreach (var tc in msg.ToolCalls)
+                    {
+                        toolCallsArr.Add(new JObject
+                        {
+                            ["id"] = tc.Id,
+                            ["type"] = "function",
+                            ["function"] = new JObject
+                            {
+                                ["name"] = tc.ToolName,
+                                ["arguments"] = tc.ArgumentsJson ?? "{}"
+                            }
+                        });
+                    }
+                    msgObj["tool_calls"] = toolCallsArr;
+                    arr.Add(msgObj);
+                }
+                else
+                {
+                    arr.Add(new JObject
+                    {
+                        ["role"] = msg.Role.ToString().ToLowerInvariant(),
+                        ["content"] = msg.Content
+                    });
+                }
             }
             return arr;
         }
@@ -87,15 +147,32 @@ namespace UnAI.Providers
         {
             var root = JObject.Parse(json);
             var choice = root["choices"]?[0];
+            var message = choice?["message"];
 
-            return new UnaiChatResponse
+            var response = new UnaiChatResponse
             {
-                Content = choice?["message"]?["content"]?.ToString() ?? "",
+                Content = message?["content"]?.ToString() ?? "",
                 Role = UnaiRole.Assistant,
                 Model = root["model"]?.ToString(),
                 FinishReason = choice?["finish_reason"]?.ToString(),
                 Usage = ParseUsage(root["usage"])
             };
+
+            if (message?["tool_calls"] is JArray toolCalls && toolCalls.Count > 0)
+            {
+                response.ToolCalls = new List<UnaiToolCall>();
+                foreach (var tc in toolCalls)
+                {
+                    response.ToolCalls.Add(new UnaiToolCall
+                    {
+                        Id = tc["id"]?.ToString(),
+                        ToolName = tc["function"]?["name"]?.ToString(),
+                        ArgumentsJson = tc["function"]?["arguments"]?.ToString()
+                    });
+                }
+            }
+
+            return response;
         }
 
         protected UnaiUsageInfo ParseUsage(JToken usageToken)

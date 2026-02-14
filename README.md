@@ -26,6 +26,10 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 ## Features
 
 - **Unified API** — one interface for all providers, switch with a single line
+- **AI Agent system** — multi-step reasoning with tool calling, conversation memory, and observe-think-act loop
+- **Tool/Function calling** — native support for OpenAI, Anthropic, and Gemini; text-based fallback for all others
+- **Editor AI Assistant** — built-in editor window that can inspect scenes, create GameObjects, read scripts, and more
+- **Conversation memory** — token-aware history management with automatic truncation
 - **Real-time streaming** — token-by-token responses on the main thread, perfect for chat UIs
 - **Async/await** — native C# `Task`-based API, no coroutine boilerplate
 - **Cross-platform** — Windows, Mac, Linux, Android, iOS, and WebGL via `UnityWebRequest`
@@ -34,9 +38,12 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 - **Zero dependencies** — only requires Newtonsoft JSON (auto-installed)
 - **Runtime provider switching** — change AI backends on the fly without restarting
 - **ScriptableObject config** — inspector-friendly setup with env var overrides for production
+- **Modular** — 3 independent modules (core, agent, editor assistant) — use only what you need, delete the rest
 
 ## Use Cases
 
+- **AI agents** for games — NPCs with tool use, memory, and multi-step reasoning
+- **Editor AI assistant** — inspect scenes, create objects, read scripts from a chat window
 - NPC dialogue and AI-driven characters in games
 - In-editor AI coding and content generation tools
 - AI-powered game mechanics (procedural quests, adaptive difficulty)
@@ -146,19 +153,152 @@ _ = UnaiManager.Instance.ChatStreamAsync(request, onDelta: ..., ct: cts.Token);
 cts.Cancel();
 ```
 
+## AI Agent System
+
+The agent system adds multi-step reasoning with tool calling and conversation memory on top of the chat API.
+
+### Agent with custom tools
+
+```csharp
+using UnAI.Agent;
+using UnAI.Tools;
+
+// Create tools
+var tools = new UnaiToolRegistry();
+tools.Register(new MyWeatherTool());   // implements IUnaiTool
+tools.Register(new MyDatabaseTool());
+
+// Create and run agent
+var agent = new UnaiAgent(new UnaiAgentConfig
+{
+    SystemPrompt = "You are a helpful game assistant.",
+    MaxSteps = 5,
+    UseStreaming = true
+}, tools);
+
+agent.OnToolCall += args => Debug.Log($"Calling: {args.ToolCall.ToolName}");
+agent.OnToolResult += args => Debug.Log($"Result: {args.Result.Content}");
+
+var result = await agent.RunAsync("What's the weather in the player's city?");
+Debug.Log(result.Response.Content);
+
+// Continue the conversation (keeps memory)
+var followUp = await agent.ContinueAsync("What about tomorrow?");
+```
+
+### Implementing a custom tool
+
+```csharp
+using UnAI.Tools;
+using Newtonsoft.Json.Linq;
+
+public class MyWeatherTool : IUnaiTool
+{
+    public UnaiToolDefinition Definition => new()
+    {
+        Name = "get_weather",
+        Description = "Get current weather for a city.",
+        ParametersSchema = JObject.Parse(@"{
+            ""type"": ""object"",
+            ""properties"": {
+                ""city"": { ""type"": ""string"", ""description"": ""City name"" }
+            },
+            ""required"": [""city""]
+        }")
+    };
+
+    public async Task<UnaiToolResult> ExecuteAsync(UnaiToolCall call, CancellationToken ct)
+    {
+        var args = call.GetArguments();
+        string city = args["city"].ToString();
+        // ... fetch weather data ...
+        return new UnaiToolResult { Content = $"Sunny, 22C in {city}" };
+    }
+}
+```
+
+### Conversation memory (standalone)
+
+```csharp
+using UnAI.Memory;
+
+var conversation = new UnaiConversation { SystemPrompt = "You are an NPC shopkeeper." };
+conversation.AddUser("What do you sell?");
+
+// Build request with automatic token-aware truncation
+var request = conversation.BuildRequest(maxContextTokens: 4096);
+var response = await UnaiManager.Instance.ChatAsync(request);
+
+conversation.AddAssistant(response.Content);
+// Conversation remembers full history, truncates oldest when needed
+```
+
+## Editor AI Assistant
+
+Open **Window > UnAI > AI Assistant** to get a chat-powered assistant directly in the Unity Editor.
+
+### Built-in tools
+
+| Tool | Description |
+|------|-------------|
+| `inspect_scene` | List all GameObjects in the active scene hierarchy |
+| `find_gameobject` | Find GameObjects by name, tag, or component |
+| `create_gameobject` | Create a GameObject with position and components (Undo supported) |
+| `inspect_gameobject` | Get transform, components, and properties of a GameObject |
+| `read_script` | Read contents of a C# script file |
+| `list_assets` | List assets in a project folder |
+| `get_selection` | Get currently selected objects in the editor |
+| `log_message` | Write a message to the Unity Console |
+
+The assistant uses the same agent system, so it reasons through multi-step tasks and calls tools automatically.
+
+## Modular Structure
+
+UNAI is split into **3 independent modules**. Use what you need, delete what you don't:
+
+| Module | Folder | Assembly | Purpose |
+|--------|--------|----------|---------|
+| **Core** | `Scripts/Runtime/` | `UnAI.Runtime` | Chat API, providers, streaming — always required |
+| **Agent System** | `Scripts/Agent/` | `UnAI.Agent` | Tool calling, memory, agent loop — for in-game AI agents |
+| **Editor Assistant** | `Scripts/EditorAssistant/` | `UnAI.EditorAssistant` | Editor AI window — for developer tooling |
+
+```
+Scripts/
+  Runtime/            <- Core chat API (always keep)
+  Agent/              <- Agent system (delete to remove agent features)
+  EditorAssistant/    <- Editor AI assistant (delete to remove editor tools)
+  Editor/             <- Core editor scripts (config inspector, setup wizard)
+```
+
+**Just want chat?** Delete `Scripts/Agent/` and `Scripts/EditorAssistant/` — the core chat API works standalone.
+
+**Want agents but no editor assistant?** Delete only `Scripts/EditorAssistant/`.
+
+**Want everything?** Keep all folders as-is.
+
+Each module has its own assembly definition, so removing a folder cleanly removes that feature with no compile errors.
+
 ## Architecture
 
 ```
-UnaiManager (MonoBehaviour, optional singleton)
-    -> UnaiProviderRegistry (static, holds all providers)
-        -> IUnaiProvider (interface)
-            -> UnaiProviderBase (template method pattern)
-                -> OpenAICompatibleBase (shared by 5 providers)
-                    -> OpenAIProvider, MistralProvider, LMStudioProvider, etc.
-                -> AnthropicProvider, GeminiProvider, CohereProvider, OllamaProvider
+Scripts/EditorAssistant/            (UnAI.EditorAssistant - editor only)
+  UnaiAssistantWindow               AI chat window in Unity Editor
+  UnaiAssistantTools                Built-in editor tools
+    |
+Scripts/Agent/                      (UnAI.Agent - runtime)
+  UnaiAgent                         Observe-think-act loop
+  Memory/UnaiConversation           Token-aware conversation history
+  Tools/UnaiToolRegistry            Tool registration + execution
+    |
+Scripts/Runtime/                    (UnAI.Runtime - core, always required)
+  UnaiManager                       MonoBehaviour singleton entry point
+  UnaiProviderRegistry              Static provider lookup
+  IUnaiProvider -> UnaiProviderBase Template method pattern
+    -> OpenAICompatibleBase         Shared by 5 providers
+    -> AnthropicProvider, GeminiProvider, CohereProvider, OllamaProvider
 ```
 
-All HTTP goes through `UnityWebRequest` (works on every platform including WebGL). Streaming uses a custom `DownloadHandlerScript` that parses SSE/NDJSON in real-time on the main thread.
+All HTTP goes through `UnityWebRequest` (works on every platform including WebGL). Streaming uses a custom `DownloadHandlerScript` that parses SSE/NDJSON in real-time on the main thread. Tool calling uses native provider APIs where available (OpenAI, Anthropic, Gemini) with text-based fallback for others.
 
 ## Configuration
 
