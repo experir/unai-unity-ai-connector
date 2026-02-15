@@ -85,12 +85,32 @@ namespace UnAI.Http
                     : UnaiErrorType.Unknown
             };
 
+            // Parse Retry-After header (seconds or HTTP-date)
+            float? retryAfter = null;
+            string retryHeader = request.GetResponseHeader("Retry-After");
+            if (!string.IsNullOrEmpty(retryHeader))
+            {
+                if (float.TryParse(retryHeader, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float secs))
+                {
+                    retryAfter = secs;
+                }
+                else if (System.DateTime.TryParse(retryHeader,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var date))
+                {
+                    retryAfter = (float)(date.ToUniversalTime() - System.DateTime.UtcNow).TotalSeconds;
+                    if (retryAfter < 0) retryAfter = 0;
+                }
+            }
+
             return new UnaiErrorInfo
             {
                 ErrorType = errorType,
                 Message = request.error,
                 HttpStatusCode = statusCode,
-                RawResponse = request.downloadHandler?.text
+                RawResponse = request.downloadHandler?.text,
+                RetryAfterSeconds = retryAfter
             };
         }
     }

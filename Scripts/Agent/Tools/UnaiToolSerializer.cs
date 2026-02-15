@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine;
 
 namespace UnAI.Tools
 {
@@ -73,18 +74,28 @@ namespace UnAI.Tools
                 {
                     string json = trimmed.Substring(start, end - start + 1);
                     var obj = JObject.Parse(json);
-                    string toolName = obj["tool"]?.ToString();
+
+                    // Support both {"tool": "name", "arguments": {...}} and {"name": "name", "arguments": {...}}
+                    string toolName = obj["tool"]?.ToString()
+                        ?? obj["name"]?.ToString()
+                        ?? obj["function"]?.ToString();
+
                     if (!string.IsNullOrEmpty(toolName))
                     {
+                        var argsToken = obj["arguments"] ?? obj["parameters"] ?? obj["args"];
                         results.Add(new UnaiToolCall
                         {
                             Id = $"text_{System.Guid.NewGuid():N}".Substring(0, 16),
                             ToolName = toolName,
-                            ArgumentsJson = obj["arguments"]?.ToString(Formatting.None) ?? "{}"
+                            ArgumentsJson = argsToken?.ToString(Formatting.None) ?? "{}"
                         });
+                        Debug.Log($"[UNAI] ParseTextToolCalls: found tool '{toolName}'");
                     }
                 }
-                catch { /* skip malformed JSON */ }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[UNAI] ParseTextToolCalls: Failed to parse JSON at pos {start}: {ex.Message}");
+                }
 
                 pos = end + 1;
             }

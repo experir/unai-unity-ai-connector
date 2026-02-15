@@ -78,45 +78,99 @@ namespace UnAI.Core
             string url = BuildRequestUrl(request);
             string body = SerializeRequest(request);
             var headers = BuildHeaders();
-            var parser = CreateStreamParser();
 
-            UnaiChatResponse finalResponse = null;
+            int maxRetries = Config.MaxRetries;
 
-            await UnaiHttpStreamClient.StreamPostAsync(
-                url, body, headers, parser,
-                onDelta: delta =>
-                {
-                    onDelta?.Invoke(delta);
+            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-                    if (delta.IsFinal)
+                var parser = CreateStreamParser();
+                UnaiChatResponse finalResponse = null;
+                UnaiErrorInfo streamError = null;
+
+                await UnaiHttpStreamClient.StreamPostAsync(
+                    url, body, headers, parser,
+                    onDelta: delta =>
                     {
-                        finalResponse = new UnaiChatResponse
+                        onDelta?.Invoke(delta);
+
+                        if (delta.IsFinal)
                         {
-                            Content = delta.AccumulatedContent,
-                            Role = UnaiRole.Assistant,
-                            Model = request.Model,
+                            finalResponse = new UnaiChatResponse
+                            {
+                                Content = delta.AccumulatedContent,
+                                Role = UnaiRole.Assistant,
+                                Model = request.Model,
+                                ProviderId = ProviderId,
+                                FinishReason = delta.FinishReason,
+                                WasStreamed = true,
+                                ToolCalls = delta.ToolCalls
+                            };
+                        }
+                        else if (delta.ToolCalls is { Count: > 0 })
+                        {
+                            // Capture tool calls from intermediate deltas too
+                            if (finalResponse == null)
+                            {
+                                finalResponse = new UnaiChatResponse
+                                {
+                                    Content = delta.AccumulatedContent,
+                                    Role = UnaiRole.Assistant,
+                                    Model = request.Model,
+                                    ProviderId = ProviderId,
+                                    WasStreamed = true
+                                };
+                            }
+                            finalResponse.ToolCalls = delta.ToolCalls;
+                        }
+                    },
+                    onComplete: () =>
+                    {
+                        finalResponse ??= new UnaiChatResponse
+                        {
+                            Content = "",
                             ProviderId = ProviderId,
-                            FinishReason = delta.FinishReason,
                             WasStreamed = true
                         };
-                    }
-                },
-                onComplete: () =>
-                {
-                    finalResponse ??= new UnaiChatResponse
+                        onComplete?.Invoke(finalResponse);
+                    },
+                    onError: error =>
                     {
-                        Content = "",
-                        ProviderId = ProviderId,
-                        WasStreamed = true
-                    };
-                    onComplete?.Invoke(finalResponse);
-                },
-                onError: error =>
+                        error.ProviderId = ProviderId;
+                        streamError = error;
+                    },
+                    cancellationToken);
+
+                // If no error, we're done
+                if (streamError == null)
+                    return;
+
+                // If the error is not retryable or we've exhausted retries, report it
+                if (!streamError.IsRetryable || attempt >= maxRetries)
                 {
-                    error.ProviderId = ProviderId;
-                    onError?.Invoke(error);
-                },
-                cancellationToken);
+                    onError?.Invoke(streamError);
+                    return;
+                }
+
+                // Use Retry-After header if available, otherwise exponential backoff
+                float delaySeconds;
+                if (streamError.RetryAfterSeconds.HasValue)
+                {
+                    delaySeconds = streamError.RetryAfterSeconds.Value + UnityEngine.Random.Range(0.1f, 1f);
+                }
+                else if (streamError.ErrorType == UnaiErrorType.RateLimit)
+                {
+                    // Rate limits need longer waits (5s, 10s, 20s base)
+                    delaySeconds = 5f * MathF.Pow(2, attempt) + UnityEngine.Random.Range(0f, 2f);
+                }
+                else
+                {
+                    delaySeconds = MathF.Pow(2, attempt) + UnityEngine.Random.Range(0f, 0.5f);
+                }
+                UnaiLogger.Log($"[UNAI] Retrying streaming request (attempt {attempt + 1}/{maxRetries}) after {delaySeconds:F1}s: {streamError.Message}");
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+            }
         }
 
         protected void ResolveModel(UnaiChatRequest request)

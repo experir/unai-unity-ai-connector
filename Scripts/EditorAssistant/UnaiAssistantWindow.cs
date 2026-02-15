@@ -21,17 +21,26 @@ namespace UnAI.Editor.Assistant
         private bool _isProcessing;
         private string _streamingContent = "";
 
-        // UI state
-        private string _inputText = "";
+        // UI state (serialized to survive domain reload)
+        [SerializeField] private string _inputText = "";
         private Vector2 _scrollPos;
         private bool _scrollToBottom;
-        private int _selectedProviderIndex;
-        private string _modelOverride = "";
+        [SerializeField] private int _selectedProviderIndex;
+        [SerializeField] private string _modelOverride = "";
+        [SerializeField] private int _maxSteps = 10;
         private string[] _providerNames = Array.Empty<string>();
         private string[] _providerIds = Array.Empty<string>();
 
-        // Chat history for display
-        private readonly List<ChatEntry> _chatEntries = new();
+        // Chat history for display — serialized to survive domain reload
+        [SerializeField] private List<ChatEntry> _chatEntries = new();
+
+        // Conversation messages — serialized so the agent can be restored after
+        // Unity recompiles (domain reload). We store the raw JSON because Unity
+        // cannot natively serialize the Newtonsoft-based models with generics.
+        [SerializeField] private string _serializedConversation;
+
+        // Flag: was a request in flight when domain reload happened?
+        [SerializeField] private bool _wasProcessingBeforeReload;
 
         private GUIStyle _userStyle;
         private GUIStyle _assistantStyle;
@@ -51,10 +60,13 @@ namespace UnAI.Editor.Assistant
         {
             LoadConfig();
             RefreshProviderList();
+            RestoreAfterDomainReload();
         }
 
         private void OnDisable()
         {
+            // Save conversation state before potential domain reload
+            SaveConversationState();
             CancelRequest();
         }
 
@@ -207,6 +219,17 @@ namespace UnAI.Editor.Assistant
             _modelOverride = EditorGUILayout.TextField(_modelOverride,
                 EditorStyles.toolbarTextField, GUILayout.MinWidth(120));
 
+            // Max steps
+            EditorGUILayout.LabelField("Steps:", GUILayout.Width(38));
+            EditorGUI.BeginChangeCheck();
+            _maxSteps = EditorGUILayout.IntField(_maxSteps,
+                EditorStyles.toolbarTextField, GUILayout.Width(30));
+            if (EditorGUI.EndChangeCheck())
+            {
+                _maxSteps = Mathf.Clamp(_maxSteps, 1, 50);
+                ResetAgent();
+            }
+
             GUILayout.FlexibleSpace();
 
             // Clear button
@@ -215,6 +238,8 @@ namespace UnAI.Editor.Assistant
                 CancelRequest();
                 _chatEntries.Clear();
                 _agent = null;
+                _serializedConversation = null;
+                _wasProcessingBeforeReload = false;
             }
 
             EditorGUILayout.EndHorizontal();
@@ -369,7 +394,23 @@ namespace UnAI.Editor.Assistant
                     _chatEntries.Add(new ChatEntry
                     {
                         Type = ChatEntryType.Assistant,
-                        Content = "(Reached maximum steps limit)"
+                        Content = "(Reached maximum steps limit. You can increase Max Steps in the toolbar, or try rephrasing your request.)"
+                    });
+                }
+                else if (step?.StopReason == "stuck_loop")
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = "(The AI got stuck repeating the same action. Try rephrasing your request or breaking it into smaller steps.)"
+                    });
+                }
+                else if (step?.StopReason == "stuck_error")
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = "(The AI kept hitting the same error and couldn't recover. Try a different approach or simplify the request.)"
                     });
                 }
             }
@@ -380,6 +421,15 @@ namespace UnAI.Editor.Assistant
                     Type = ChatEntryType.Assistant,
                     Content = "(Cancelled)"
                 });
+            }
+            catch (UnaiRequestException reqEx)
+            {
+                _chatEntries.Add(new ChatEntry
+                {
+                    Type = ChatEntryType.Assistant,
+                    Content = $"⚠ {reqEx.ErrorInfo.UserFriendlyMessage}"
+                });
+                Debug.LogException(reqEx);
             }
             catch (Exception ex)
             {
@@ -393,8 +443,10 @@ namespace UnAI.Editor.Assistant
             finally
             {
                 _isProcessing = false;
+                _wasProcessingBeforeReload = false;
                 _streamingContent = "";
                 _scrollToBottom = true;
+                SaveConversationState();
                 Repaint();
             }
         }
@@ -416,7 +468,7 @@ namespace UnAI.Editor.Assistant
             {
                 ProviderId = providerId,
                 Model = model,
-                MaxSteps = 10,
+                MaxSteps = _maxSteps,
                 TimeoutSeconds = 120,
                 UseStreaming = true,
                 SystemPrompt = BuildSystemPrompt()
@@ -487,6 +539,7 @@ namespace UnAI.Editor.Assistant
         {
             CancelRequest();
             _agent = null;
+            _serializedConversation = null;
         }
 
         private void CancelRequest()
@@ -497,18 +550,222 @@ namespace UnAI.Editor.Assistant
             _isProcessing = false;
         }
 
+        /// <summary>
+        /// Saves the current agent conversation to a serialized field so it
+        /// survives Unity domain reloads (triggered by script compilation).
+        /// </summary>
+        private void SaveConversationState()
+        {
+            if (_isProcessing)
+                _wasProcessingBeforeReload = true;
+
+            if (_agent?.Conversation?.Messages != null && _agent.Conversation.Messages.Count > 0)
+            {
+                try
+                {
+                    _serializedConversation = Newtonsoft.Json.JsonConvert.SerializeObject(
+                        _agent.Conversation.Messages,
+                        Newtonsoft.Json.Formatting.None,
+                        new Newtonsoft.Json.JsonSerializerSettings
+                        {
+                            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None
+                        });
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[UNAI] Failed to save conversation state: {ex.Message}");
+                    _serializedConversation = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// After a domain reload, restores the agent with its prior conversation
+        /// so the user can continue where they left off.
+        /// If the agent was mid-loop (e.g. after creating a script), it auto-resumes.
+        /// </summary>
+        private void RestoreAfterDomainReload()
+        {
+            // Nothing to restore
+            if (_chatEntries == null || _chatEntries.Count == 0)
+                return;
+
+            bool wasProcessing = _wasProcessingBeforeReload;
+            _wasProcessingBeforeReload = false;
+            _isProcessing = false;
+            _streamingContent = "";
+
+            // Restore conversation into a fresh agent
+            if (!string.IsNullOrEmpty(_serializedConversation))
+            {
+                try
+                {
+                    var messages = Newtonsoft.Json.JsonConvert.DeserializeObject<List<UnaiChatMessage>>(
+                        _serializedConversation);
+
+                    if (messages is { Count: > 0 })
+                    {
+                        EnsureAgent();
+                        foreach (var msg in messages)
+                        {
+                            // Skip system messages — the agent already has its own
+                            if (msg.Role != UnaiRole.System)
+                                _agent.Conversation.Add(msg);
+                        }
+                        Debug.Log($"[UNAI] Restored {messages.Count} conversation messages after domain reload.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[UNAI] Failed to restore conversation: {ex.Message}");
+                    wasProcessing = false; // can't auto-resume without conversation
+                }
+
+                _serializedConversation = null;
+            }
+            else
+            {
+                wasProcessing = false; // nothing to resume from
+            }
+
+            // If the agent was mid-loop when recompilation happened, auto-resume
+            if (wasProcessing && _agent != null)
+            {
+                _chatEntries.Add(new ChatEntry
+                {
+                    Type = ChatEntryType.Assistant,
+                    Content = "(Script compiled successfully. Resuming...)"
+                });
+                _scrollToBottom = true;
+                Repaint();
+                AutoResume();
+            }
+        }
+
+        /// <summary>
+        /// Automatically continues the agent loop after a domain reload
+        /// caused by script creation. Sends a context message so the model
+        /// knows compilation succeeded and it should proceed.
+        /// </summary>
+        private async void AutoResume()
+        {
+            _isProcessing = true;
+            _streamingContent = "";
+            _scrollToBottom = true;
+
+            try
+            {
+                EnsureAgent();
+                _cts = new CancellationTokenSource();
+
+                var step = await _agent.ContinueAsync(
+                    "The script was created and compiled successfully. Unity has reloaded. " +
+                    "Continue with the next steps of the original request.",
+                    _cts.Token);
+
+                if (step?.Response != null && !string.IsNullOrEmpty(step.Response.Content))
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = step.Response.Content
+                    });
+                }
+
+                if (step?.StopReason == "max_steps")
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = "(Reached maximum steps limit. You can increase Max Steps in the toolbar, or try rephrasing your request.)"
+                    });
+                }
+                else if (step?.StopReason == "stuck_loop")
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = "(The AI got stuck repeating the same action. Try rephrasing your request or breaking it into smaller steps.)"
+                    });
+                }
+                else if (step?.StopReason == "stuck_error")
+                {
+                    _chatEntries.Add(new ChatEntry
+                    {
+                        Type = ChatEntryType.Assistant,
+                        Content = "(The AI kept hitting the same error and couldn't recover. Try a different approach or simplify the request.)"
+                    });
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _chatEntries.Add(new ChatEntry
+                {
+                    Type = ChatEntryType.Assistant,
+                    Content = "(Cancelled)"
+                });
+            }
+            catch (UnaiRequestException reqEx)
+            {
+                _chatEntries.Add(new ChatEntry
+                {
+                    Type = ChatEntryType.Assistant,
+                    Content = $"⚠ {reqEx.ErrorInfo.UserFriendlyMessage}"
+                });
+                Debug.LogException(reqEx);
+            }
+            catch (Exception ex)
+            {
+                _chatEntries.Add(new ChatEntry
+                {
+                    Type = ChatEntryType.Assistant,
+                    Content = $"Error: {ex.Message}"
+                });
+                Debug.LogException(ex);
+            }
+            finally
+            {
+                _isProcessing = false;
+                _wasProcessingBeforeReload = false;
+                _streamingContent = "";
+                _scrollToBottom = true;
+                SaveConversationState();
+                Repaint();
+            }
+        }
+
         private string BuildSystemPrompt()
         {
             return
                 "You are UNAI Assistant, an AI helper embedded in the Unity Editor. " +
                 "You help developers work with their Unity projects by inspecting scenes, finding and creating GameObjects, " +
-                "reading scripts, listing assets, and more.\n\n" +
-                "Guidelines:\n" +
-                "- Use the available tools to answer questions about the user's project.\n" +
-                "- When creating or modifying objects, always confirm what you did.\n" +
-                "- Keep responses concise and focused on the task.\n" +
-                "- If you need more information, use inspection tools before answering.\n" +
-                "- All object creation supports Undo (Ctrl+Z).";
+                "reading and creating scripts, listing assets, and more.\n\n" +
+                "CRITICAL RULES:\n" +
+                "1. You MUST call tools to perform ANY action. NEVER just describe or narrate an action.\n" +
+                "2. If you want to create a script, you MUST call the 'create_script' tool. Do NOT just write code in your response.\n" +
+                "3. If you want to create or modify a GameObject, you MUST call the appropriate tool.\n" +
+                "4. NEVER say 'I created', 'I added', or 'Here is the script' without having actually called a tool first.\n" +
+                "5. ONLY use the tools provided to you. NEVER invent or guess tool names.\n" +
+                "6. Do NOT pass null values in tool arguments. Omit optional parameters instead of setting them to null.\n\n" +
+                "AVAILABLE TOOLS:\n" +
+                "- 'create_gameobject': Create GameObjects (supports 'components' list like ['Rigidbody', 'Camera', 'Light'])\n" +
+                "- 'modify_gameobject': Transform, rename, add/remove components, delete existing GameObjects\n" +
+                "- 'create_prefab': Save a scene GameObject as a Prefab asset\n" +
+                "- 'create_material': Create materials with color, shader, metallic, emission, and optionally apply to a GameObject\n" +
+                "- 'create_script': Create new C# scripts with 'path' and 'content'\n" +
+                "- 'modify_script': Edit existing scripts (find/replace, insert at line, or overwrite)\n" +
+                "- 'read_script': Read C# file contents\n" +
+                "- 'inspect_scene': List all root GameObjects in the scene\n" +
+                "- 'find_gameobject': Search for GameObjects by name, tag, or component\n" +
+                "- 'inspect_gameobject': Get detailed info about a specific GameObject\n" +
+                "- 'list_assets': List project assets by folder and type\n" +
+                "- 'get_selection': Get currently selected objects\n" +
+                "- 'execute_menu_item': Run any Unity menu command (e.g. 'GameObject/Light/Directional Light')\n" +
+                "- 'undo': Undo previous action(s)\n" +
+                "- 'get_console_logs': Read Unity Console messages (errors, warnings, logs)\n" +
+                "- 'log_message': Write to Unity Console\n\n" +
+                "WORKFLOW: Think about what tools you need, then call them one by one. " +
+                "After all tool calls are done, give a brief summary of what was accomplished.";
         }
 
         private static string TruncateArgs(string json)
@@ -519,12 +776,13 @@ namespace UnAI.Editor.Assistant
 
         private enum ChatEntryType { User, Assistant, ToolCall, ToolResult }
 
+        [Serializable]
         private class ChatEntry
         {
-            public ChatEntryType Type;
-            public string Content;
-            public string ToolName;
-            public string ToolArgs;
+            [SerializeField] public ChatEntryType Type;
+            [SerializeField] public string Content;
+            [SerializeField] public string ToolName;
+            [SerializeField] public string ToolArgs;
         }
     }
 }

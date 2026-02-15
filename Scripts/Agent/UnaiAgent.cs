@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UnAI.Core;
@@ -66,6 +67,11 @@ namespace UnAI.Agent
             var token = linked.Token;
 
             UnaiAgentStep lastStep = null;
+            int hallucinationNudges = 0;
+            const int MaxHallucinationNudges = 2;
+            var recentToolCalls = new List<string>(); // track for loop detection
+            int consecutiveErrors = 0;
+            string lastErrorContent = null;
 
             for (int step = 1; step <= _config.MaxSteps; step++)
             {
@@ -105,16 +111,33 @@ namespace UnAI.Agent
                 else
                     response = await _provider.ChatAsync(request, token);
 
+                Debug.Log($"[UNAI] Step {step}: Response received. " +
+                    $"Content length={response.Content?.Length ?? 0}, " +
+                    $"NativeToolCalls={response.ToolCalls?.Count ?? 0}, " +
+                    $"FinishReason={response.FinishReason}");
+
                 // Record response
                 _conversation.AddAssistant(response.Content, response.ToolCalls);
 
-                // Check for tool calls
+                // Check for tool calls (native)
                 List<UnaiToolCall> toolCalls = response.ToolCalls;
 
-                // For non-native-tool providers, try parsing text-based tool calls
-                if (toolCalls == null && !_provider.SupportsToolCalling && hasTools)
+                // Fallback: try parsing text-based tool calls from the response content
+                // This handles models that output tool calls as JSON text rather than using native function calling
+                if ((toolCalls == null || toolCalls.Count == 0) && hasTools
+                    && !string.IsNullOrWhiteSpace(response.Content))
                 {
-                    toolCalls = UnaiToolSerializer.ParseTextToolCalls(response.Content);
+                    var textToolCalls = UnaiToolSerializer.ParseTextToolCalls(response.Content);
+                    if (textToolCalls is { Count: > 0 })
+                    {
+                        Debug.Log($"[UNAI] Step {step}: Parsed {textToolCalls.Count} text-based tool call(s) from response");
+                        toolCalls = textToolCalls;
+                    }
+                    else
+                    {
+                        Debug.Log($"[UNAI] Step {step}: No tool calls detected (native or text). " +
+                            $"Content preview: {(response.Content.Length > 200 ? response.Content.Substring(0, 200) + "..." : response.Content)}");
+                    }
                 }
 
                 List<UnaiToolResult> toolResults = null;
@@ -137,7 +160,22 @@ namespace UnAI.Agent
 
                         toolResults.Add(result);
                         _conversation.AddToolResult(result.ToolCallId, result.ToolName, result.Content);
-
+                    // Track consecutive errors with same content
+                    if (result.IsError)
+                    {
+                        if (result.Content == lastErrorContent)
+                            consecutiveErrors++;
+                        else
+                        {
+                            consecutiveErrors = 1;
+                            lastErrorContent = result.Content;
+                        }
+                    }
+                    else
+                    {
+                        consecutiveErrors = 0;
+                        lastErrorContent = null;
+                    }
                         OnToolResult?.Invoke(new UnaiAgentToolResultArgs
                         {
                             StepNumber = step,
@@ -148,7 +186,66 @@ namespace UnAI.Agent
                 }
 
                 float stepDuration = (Time.realtimeSinceStartup - stepStart) * 1000f;
-                bool isFinal = toolCalls == null || toolCalls.Count == 0;
+                bool noToolCalls = toolCalls == null || toolCalls.Count == 0;
+                bool isFinal = noToolCalls;
+
+                // Hallucination detection: if no tool calls but response looks like the
+                // model is describing actions it should have used tools for, nudge it
+                // to actually use tools and continue the loop.
+                if (noToolCalls && hasTools && step < _config.MaxSteps
+                    && !string.IsNullOrWhiteSpace(response.Content)
+                    && LooksLikeHallucinatedAction(response.Content))
+                {
+                    hallucinationNudges++;
+                    if (hallucinationNudges <= MaxHallucinationNudges)
+                    {
+                        Debug.Log($"[UNAI] Step {step}: Detected hallucinated action in text response. Nudging model to use tools. (nudge {hallucinationNudges}/{MaxHallucinationNudges})");
+                        var available = string.Join(", ", _tools.GetNames());
+                        _conversation.AddUser(
+                            "You described performing an action but did NOT actually call a tool. " +
+                            "Nothing happened in the scene. You MUST use the provided tools to perform actions. " +
+                            $"Available tools: {available}. " +
+                            "Please call the appropriate tool(s) now to actually perform the action.");
+                        isFinal = false;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[UNAI] Step {step}: Hallucination nudge limit reached ({MaxHallucinationNudges}). Accepting response as final.");
+                        isFinal = true;
+                    }
+                }
+
+                // Loop/stuck detection: if the same tool calls keep repeating, break out
+                string stopReason = null;
+                if (toolCalls is { Count: > 0 })
+                {
+                    string callSignature = string.Join("|", toolCalls.Select(tc => $"{tc.ToolName}:{tc.ArgumentsJson}"));
+                    recentToolCalls.Add(callSignature);
+
+                    // Check last 4 calls for repetition
+                    if (recentToolCalls.Count >= 4)
+                    {
+                        var last4 = recentToolCalls.Skip(recentToolCalls.Count - 4).ToList();
+                        int duplicates = last4.Count(c => c == last4.Last());
+                        if (duplicates >= 3)
+                        {
+                            Debug.LogWarning($"[UNAI] Step {step}: Detected stuck loop — same tool call repeated {duplicates} times in last 4 steps. Breaking out.");
+                            isFinal = true;
+                            stopReason = "stuck_loop";
+                        }
+                    }
+                }
+
+                // Error repetition detection: same error 3+ times means the model can't recover
+                if (consecutiveErrors >= 3)
+                {
+                    Debug.LogWarning($"[UNAI] Step {step}: Same error repeated {consecutiveErrors} times. Model is stuck. Breaking out.");
+                    isFinal = true;
+                    stopReason = "stuck_error";
+                }
+
+                if (stopReason == null && isFinal) stopReason = "completed";
+                if (step >= _config.MaxSteps) stopReason ??= "max_steps";
 
                 lastStep = new UnaiAgentStep
                 {
@@ -158,7 +255,7 @@ namespace UnAI.Agent
                     ToolResults = toolResults,
                     DurationMs = stepDuration,
                     IsFinal = isFinal || step >= _config.MaxSteps,
-                    StopReason = isFinal ? "completed" : (step >= _config.MaxSteps ? "max_steps" : null)
+                    StopReason = stopReason
                 };
 
                 OnStepComplete?.Invoke(new UnaiAgentStepCompleteArgs { Step = lastStep });
@@ -178,13 +275,28 @@ namespace UnAI.Agent
         private async Task<UnaiToolResult> ExecuteToolAsync(UnaiToolCall call, CancellationToken ct)
         {
             var tool = _tools.Get(call.ToolName);
+
+            // Fuzzy match: try to find the intended tool
             if (tool == null)
             {
+                tool = _tools.GetFuzzy(call.ToolName);
+                if (tool != null)
+                {
+                    Debug.Log($"[UNAI] Fuzzy-matched tool '{call.ToolName}' → '{tool.Definition.Name}'");
+                    call.ToolName = tool.Definition.Name;
+                }
+            }
+
+            if (tool == null)
+            {
+                var available = string.Join(", ", _tools.GetNames());
                 return new UnaiToolResult
                 {
                     ToolCallId = call.Id,
                     ToolName = call.ToolName,
-                    Content = $"Error: Unknown tool '{call.ToolName}'",
+                    Content = $"Error: Unknown tool '{call.ToolName}'. " +
+                              $"Available tools are: {available}. " +
+                              $"Please use one of these exact tool names.",
                     IsError = true
                 };
             }
@@ -228,6 +340,49 @@ namespace UnAI.Agent
                 ct);
 
             return await tcs.Task;
+        }
+
+        /// <summary>
+        /// Detects when the model's text response describes performing Unity actions
+        /// without actually calling tools (hallucinated actions), or outputs
+        /// raw JSON tool call text instead of using native function calling.
+        /// </summary>
+        private bool LooksLikeHallucinatedAction(string content)
+        {
+            // Check for code blocks (model outputting scripts as text)
+            if (content.Contains("```"))
+                return true;
+
+            // Check for raw JSON that looks like a tool call the model failed to invoke natively
+            string trimmed = content.Trim();
+            if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+            {
+                // Check if the JSON contains any known tool name
+                var toolNames = _tools.GetNames();
+                foreach (var name in toolNames)
+                {
+                    if (trimmed.Contains(name, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+
+            // Check for action verbs that suggest the model thinks it did something
+            var actionPatterns = new[]
+            {
+                @"\b(I('ve|\s+have)|I\s+)\s*(created|added|attached|modified|updated|moved|renamed|deleted|removed|set|placed|spawned|instantiat)",
+                @"\b(script|component|gameobject|object|prefab)\s+(has been|was|is)\s+(created|added|attached|modified|placed)",
+                @"\bAdded\s+(script|component|a\s+new)",
+                @"\bCreated\s+(a\s+new\s+)?(script|file|class)",
+                @"\bHere('s|\s+is)\s+(the|a|your)\s+(script|code|component)",
+            };
+
+            foreach (var pattern in actionPatterns)
+            {
+                if (Regex.IsMatch(content, pattern, RegexOptions.IgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         private int? GetModelContextWindow()

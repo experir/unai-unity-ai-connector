@@ -23,8 +23,21 @@ namespace UnAI.Utilities
                     return result;
 
                 attempt++;
-                float delaySeconds = MathF.Pow(2, attempt - 1);
-                delaySeconds += UnityEngine.Random.Range(0f, 0.5f);
+                float delaySeconds;
+                if (result.error.RetryAfterSeconds.HasValue)
+                {
+                    // Respect server-specified Retry-After with small jitter
+                    delaySeconds = result.error.RetryAfterSeconds.Value + UnityEngine.Random.Range(0.1f, 1f);
+                }
+                else if (result.error.ErrorType == UnaiErrorType.RateLimit)
+                {
+                    // Rate limits need longer waits (5s, 10s, 20s base)
+                    delaySeconds = 5f * MathF.Pow(2, attempt - 1) + UnityEngine.Random.Range(0f, 2f);
+                }
+                else
+                {
+                    delaySeconds = MathF.Pow(2, attempt - 1) + UnityEngine.Random.Range(0f, 0.5f);
+                }
 
                 UnaiLogger.Log($"[UNAI] Retrying request (attempt {attempt}/{maxRetries}) after {delaySeconds:F1}s: {result.error.Message}");
 

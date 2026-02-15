@@ -188,6 +188,12 @@ namespace UnAI.Providers
 
         protected override ISseLineParser CreateStreamParser()
         {
+            // Tool call accumulation state across streaming deltas.
+            // OpenAI streams tool calls in chunks keyed by index — we must
+            // accumulate id, name, and argument fragments before emitting
+            // the completed list on the final delta.
+            var toolCallAccum = new Dictionary<int, (string id, string name, System.Text.StringBuilder args)>();
+
             return new SseLineParser(
                 deltaFactory: (eventType, jsonData) =>
                 {
@@ -198,13 +204,58 @@ namespace UnAI.Providers
                     string finishReason = choice?["finish_reason"]?.ToString();
                     bool isFinal = !string.IsNullOrEmpty(finishReason) && finishReason != "null";
 
-                    return new UnaiStreamDelta
+                    // Accumulate streamed tool_calls chunks
+                    if (delta?["tool_calls"] is JArray tcArray)
+                    {
+                        foreach (var tc in tcArray)
+                        {
+                            int idx = tc["index"]?.Value<int>() ?? 0;
+                            string id = tc["id"]?.ToString();
+                            string name = tc["function"]?["name"]?.ToString();
+                            string argChunk = tc["function"]?["arguments"]?.ToString();
+
+                            if (!toolCallAccum.TryGetValue(idx, out var entry))
+                            {
+                                entry = (id, name, new System.Text.StringBuilder());
+                                toolCallAccum[idx] = entry;
+                            }
+                            else
+                            {
+                                // Update id/name if provided in a later chunk (shouldn't happen, but be safe)
+                                if (!string.IsNullOrEmpty(id)) entry.id = id;
+                                if (!string.IsNullOrEmpty(name)) entry.name = name;
+                                toolCallAccum[idx] = entry;
+                            }
+
+                            if (!string.IsNullOrEmpty(argChunk))
+                                toolCallAccum[idx].args.Append(argChunk);
+                        }
+                    }
+
+                    var streamDelta = new UnaiStreamDelta
                     {
                         Content = content,
                         IsFinal = isFinal,
                         FinishReason = isFinal ? finishReason : null,
                         EventType = eventType
                     };
+
+                    // When the stream is done and we accumulated tool calls, attach them
+                    if (isFinal && toolCallAccum.Count > 0)
+                    {
+                        streamDelta.ToolCalls = new List<UnaiToolCall>();
+                        foreach (var kvp in toolCallAccum)
+                        {
+                            streamDelta.ToolCalls.Add(new UnaiToolCall
+                            {
+                                Id = kvp.Value.id,
+                                ToolName = kvp.Value.name,
+                                ArgumentsJson = kvp.Value.args.ToString()
+                            });
+                        }
+                    }
+
+                    return streamDelta;
                 },
                 doneMarker: "[DONE]");
         }
