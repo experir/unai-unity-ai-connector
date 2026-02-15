@@ -12,5 +12,6 @@ namespace UnAI.Models
         public string FinishReason { get; set; }
         public string EventType { get; set; }
         public List<UnaiToolCall> ToolCalls { get; set; }
+        public UnaiUsageInfo Usage { get; set; }
     }
 }

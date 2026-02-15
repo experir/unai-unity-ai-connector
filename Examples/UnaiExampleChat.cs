@@ -30,10 +30,23 @@ namespace UnAI.Examples
         [SerializeField] private ScrollRect _responseScroll;
         [SerializeField] private ScrollRect _logScroll;
 
+        [Header("Debug Panel (Optional)")]
+        [SerializeField] private GameObject _debugPanel;
+        [SerializeField] private Button _debugToggleButton;
+        [SerializeField] private TMP_Text _debugText;
+
         private string[] _providerIds = Array.Empty<string>();
         private readonly List<string> _logEntries = new();
         private CancellationTokenSource _cts;
         private bool _busy;
+
+        // Session debug counters
+        private int _sessionRequestCount;
+        private int _sessionTotalTokens;
+        private int _sessionTotalPromptTokens;
+        private int _sessionTotalCompletionTokens;
+        private float _sessionTotalTimeMs;
+        private bool _debugVisible;
 
         private void Start()
         {
@@ -45,6 +58,8 @@ namespace UnAI.Examples
             _userMessageInput.text = "Hello! Tell me a short joke.";
             _statusText.text = "Ready. Select a provider and send a message.";
             _responseText.text = "";
+
+            SetupDebugPanel();
 
             Log("UNAI Example Chat ready.");
             Log("Set environment variables (OPENAI_API_KEY, etc.) or configure keys in the UnaiGlobalConfig asset.");
@@ -103,6 +118,45 @@ namespace UnAI.Examples
             });
 
             UpdateButtonStates();
+        }
+
+        private void SetupDebugPanel()
+        {
+            if (_debugPanel != null)
+                _debugPanel.SetActive(false);
+
+            if (_debugToggleButton != null)
+            {
+                _debugToggleButton.onClick.AddListener(() =>
+                {
+                    _debugVisible = !_debugVisible;
+                    if (_debugPanel != null)
+                        _debugPanel.SetActive(_debugVisible);
+                });
+            }
+
+            UpdateDebugText();
+        }
+
+        private void UpdateDebugText()
+        {
+            if (_debugText == null) return;
+
+            string avgTime = _sessionRequestCount > 0
+                ? FormatDuration(_sessionTotalTimeMs / _sessionRequestCount)
+                : "-";
+
+            _debugText.text =
+                $"<b>Session Stats</b>\n" +
+                $"Requests: {_sessionRequestCount}\n" +
+                $"Tokens: {_sessionTotalTokens} (prompt: {_sessionTotalPromptTokens}, completion: {_sessionTotalCompletionTokens})\n" +
+                $"Total time: {FormatDuration(_sessionTotalTimeMs)}  |  Avg: {avgTime}/req";
+        }
+
+        private static string FormatDuration(float ms)
+        {
+            if (ms < 1000f) return $"{ms:F0}ms";
+            return $"{ms / 1000f:F2}s";
         }
 
         private void UpdateButtonStates()
@@ -209,11 +263,24 @@ namespace UnAI.Examples
 
         private string FormatResult(float elapsed, UnaiChatResponse response)
         {
-            string result = $"Done in {elapsed:F2}s";
+            float elapsedMs = elapsed * 1000f;
+            string result = $"Done in {FormatDuration(elapsedMs)}";
             if (!string.IsNullOrEmpty(response.Model)) result += $" | Model: {response.Model}";
             if (response.Usage != null)
                 result += $" | Tokens: {response.Usage.PromptTokens}+{response.Usage.CompletionTokens}={response.Usage.TotalTokens}";
             result += $" | {_responseText.text.Length} chars";
+
+            // Accumulate session stats
+            _sessionRequestCount++;
+            _sessionTotalTimeMs += elapsedMs;
+            if (response.Usage != null)
+            {
+                _sessionTotalPromptTokens += response.Usage.PromptTokens;
+                _sessionTotalCompletionTokens += response.Usage.CompletionTokens;
+                _sessionTotalTokens += response.Usage.TotalTokens;
+            }
+            UpdateDebugText();
+
             return result;
         }
 

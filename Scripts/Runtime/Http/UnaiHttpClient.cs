@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnAI.Models;
+using UnAI.Utilities;
 using UnityEngine.Networking;
 
 namespace UnAI.Http
@@ -30,6 +31,8 @@ namespace UnAI.Http
             int timeoutSeconds,
             TaskCompletionSource<(string, int, UnaiErrorInfo)> tcs)
         {
+            UnaiLogger.LogRawJson("REQUEST", url, jsonBody);
+
             byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
 
             using var request = new UnityWebRequest(url, "POST");
@@ -59,6 +62,8 @@ namespace UnAI.Http
 
             int statusCode = (int)request.responseCode;
             string responseBody = request.downloadHandler?.text;
+
+            UnaiLogger.LogRawJson($"RESPONSE [{statusCode}]", url, responseBody);
 
             if (request.result != UnityWebRequest.Result.Success)
             {

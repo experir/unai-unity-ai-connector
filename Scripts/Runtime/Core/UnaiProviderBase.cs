@@ -105,7 +105,8 @@ namespace UnAI.Core
                                 ProviderId = ProviderId,
                                 FinishReason = delta.FinishReason,
                                 WasStreamed = true,
-                                ToolCalls = delta.ToolCalls
+                                ToolCalls = delta.ToolCalls,
+                                Usage = delta.Usage
                             };
                         }
                         else if (delta.ToolCalls is { Count: > 0 })

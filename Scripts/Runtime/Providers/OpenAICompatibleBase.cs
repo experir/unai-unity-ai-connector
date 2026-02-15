@@ -51,6 +51,12 @@ namespace UnAI.Providers
                 ["messages"] = SerializeMessages(request.Messages)
             };
 
+            // Request usage stats in streaming responses
+            if (request.Stream)
+            {
+                obj["stream_options"] = new JObject { ["include_usage"] = true };
+            }
+
             if (request.Tools is { Count: > 0 })
             {
                 var toolsArray = new JArray();
@@ -232,12 +238,25 @@ namespace UnAI.Providers
                         }
                     }
 
+                    // Parse usage if present (available when stream_options.include_usage = true)
+                    UnaiUsageInfo usage = null;
+                    if (root["usage"] is JObject usageObj && usageObj.HasValues)
+                    {
+                        usage = new UnaiUsageInfo
+                        {
+                            PromptTokens = usageObj["prompt_tokens"]?.Value<int>() ?? 0,
+                            CompletionTokens = usageObj["completion_tokens"]?.Value<int>() ?? 0,
+                            TotalTokens = usageObj["total_tokens"]?.Value<int>() ?? 0
+                        };
+                    }
+
                     var streamDelta = new UnaiStreamDelta
                     {
                         Content = content,
                         IsFinal = isFinal,
                         FinishReason = isFinal ? finishReason : null,
-                        EventType = eventType
+                        EventType = eventType,
+                        Usage = usage
                     };
 
                     // When the stream is done and we accumulated tool calls, attach them

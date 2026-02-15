@@ -5,8 +5,10 @@ using System.Threading;
 using UnAI.Agent;
 using UnAI.Config;
 using UnAI.Core;
+using UnAI.Memory;
 using UnAI.Models;
 using UnAI.Tools;
+using UnAI.Utilities;
 using UnityEditor;
 using UnityEngine;
 
@@ -42,11 +44,30 @@ namespace UnAI.Editor.Assistant
         // Flag: was a request in flight when domain reload happened?
         [SerializeField] private bool _wasProcessingBeforeReload;
 
+        // Session-level debug counters (serialized to survive domain reload)
+        [SerializeField] private int _sessionRequestCount;
+        [SerializeField] private int _sessionTotalPromptTokens;
+        [SerializeField] private int _sessionTotalCompletionTokens;
+        [SerializeField] private int _sessionTotalTokens;
+        [SerializeField] private float _sessionTotalTimeMs;
+
+        // Debug panel state
+        [SerializeField] private bool _debugFoldout;
+        [SerializeField] private bool _debugShowPerMessage = true;
+
+        // Per-request tracking (not serialized — transient during a single request)
+        private float _requestStartTime;
+        private int _requestStepCount;
+        private int _requestPromptTokens;
+        private int _requestCompletionTokens;
+
         private GUIStyle _userStyle;
         private GUIStyle _assistantStyle;
         private GUIStyle _toolStyle;
         private GUIStyle _inputStyle;
         private GUIStyle _headerStyle;
+        private GUIStyle _debugStyle;
+        private GUIStyle _debugHeaderStyle;
         private bool _stylesInitialized;
 
         [MenuItem("Window/UnAI/AI Assistant")]
@@ -142,6 +163,20 @@ namespace UnAI.Editor.Assistant
                 padding = new RectOffset(10, 10, 2, 2)
             };
 
+            _debugStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                richText = true,
+                wordWrap = true,
+                padding = new RectOffset(14, 10, 1, 1),
+                normal = { textColor = new Color(0.6f, 0.6f, 0.6f) }
+            };
+
+            _debugHeaderStyle = new GUIStyle(EditorStyles.foldout)
+            {
+                fontStyle = FontStyle.Bold,
+                fontSize = 10
+            };
+
             _stylesInitialized = true;
         }
 
@@ -157,6 +192,7 @@ namespace UnAI.Editor.Assistant
 
             DrawToolbar();
             DrawChatArea();
+            DrawDebugPanel();
             DrawInputArea();
 
             if (_scrollToBottom)
@@ -240,6 +276,11 @@ namespace UnAI.Editor.Assistant
                 _agent = null;
                 _serializedConversation = null;
                 _wasProcessingBeforeReload = false;
+                _sessionRequestCount = 0;
+                _sessionTotalPromptTokens = 0;
+                _sessionTotalCompletionTokens = 0;
+                _sessionTotalTokens = 0;
+                _sessionTotalTimeMs = 0;
             }
 
             EditorGUILayout.EndHorizontal();
@@ -375,18 +416,26 @@ namespace UnAI.Editor.Assistant
             {
                 EnsureAgent();
                 _cts = new CancellationTokenSource();
+                _requestStartTime = Time.realtimeSinceStartup;
+                _requestStepCount = 0;
+                _requestPromptTokens = 0;
+                _requestCompletionTokens = 0;
 
                 var step = await _agent.RunAsync(message, _cts.Token);
+
+                float elapsedMs = (Time.realtimeSinceStartup - _requestStartTime) * 1000f;
 
                 // The events already added tool call/result entries during execution.
                 // Add the final assistant response.
                 if (step?.Response != null && !string.IsNullOrEmpty(step.Response.Content))
                 {
-                    _chatEntries.Add(new ChatEntry
+                    var entry = new ChatEntry
                     {
                         Type = ChatEntryType.Assistant,
                         Content = step.Response.Content
-                    });
+                    };
+                    PopulateDebugInfo(entry, step, elapsedMs);
+                    _chatEntries.Add(entry);
                 }
 
                 if (step?.StopReason == "max_steps")
@@ -507,6 +556,16 @@ namespace UnAI.Editor.Assistant
                     _streamingContent = args.Delta.AccumulatedContent ?? _streamingContent + args.Delta.Content;
                     _scrollToBottom = true;
                     Repaint();
+                }
+            };
+
+            _agent.OnStepComplete += args =>
+            {
+                _requestStepCount = args.Step.StepNumber;
+                if (args.Step.Response?.Usage != null)
+                {
+                    _requestPromptTokens += args.Step.Response.Usage.PromptTokens;
+                    _requestCompletionTokens += args.Step.Response.Usage.CompletionTokens;
                 }
             };
         }
@@ -657,19 +716,27 @@ namespace UnAI.Editor.Assistant
             {
                 EnsureAgent();
                 _cts = new CancellationTokenSource();
+                _requestStartTime = Time.realtimeSinceStartup;
+                _requestStepCount = 0;
+                _requestPromptTokens = 0;
+                _requestCompletionTokens = 0;
 
                 var step = await _agent.ContinueAsync(
                     "The script was created and compiled successfully. Unity has reloaded. " +
                     "Continue with the next steps of the original request.",
                     _cts.Token);
 
+                float elapsedMs = (Time.realtimeSinceStartup - _requestStartTime) * 1000f;
+
                 if (step?.Response != null && !string.IsNullOrEmpty(step.Response.Content))
                 {
-                    _chatEntries.Add(new ChatEntry
+                    var entry = new ChatEntry
                     {
                         Type = ChatEntryType.Assistant,
                         Content = step.Response.Content
-                    });
+                    };
+                    PopulateDebugInfo(entry, step, elapsedMs);
+                    _chatEntries.Add(entry);
                 }
 
                 if (step?.StopReason == "max_steps")
@@ -768,6 +835,152 @@ namespace UnAI.Editor.Assistant
                 "After all tool calls are done, give a brief summary of what was accomplished.";
         }
 
+        private void PopulateDebugInfo(ChatEntry entry, UnaiAgentStep step, float elapsedMs)
+        {
+            entry.HasDebugInfo = true;
+            entry.ElapsedMs = elapsedMs;
+            entry.StepCount = _requestStepCount;
+            entry.StopReason = step?.StopReason;
+            entry.Model = step?.Response?.Model;
+
+            int promptTok = _requestPromptTokens;
+            int completionTok = _requestCompletionTokens;
+
+            // If step-level accumulation didn't capture tokens, try the final response
+            if (promptTok == 0 && completionTok == 0 && step?.Response?.Usage != null)
+            {
+                promptTok = step.Response.Usage.PromptTokens;
+                completionTok = step.Response.Usage.CompletionTokens;
+            }
+
+            // Fallback: estimate tokens from content when provider doesn't report usage
+            if (promptTok == 0 && completionTok == 0)
+            {
+                if (_agent?.Conversation?.Messages != null)
+                    promptTok = UnaiTokenEstimator.EstimateMessages(_agent.Conversation.Messages);
+                if (!string.IsNullOrEmpty(step?.Response?.Content))
+                    completionTok = UnaiTokenEstimator.EstimateTokens(step.Response.Content);
+                entry.IsTokenEstimated = true;
+            }
+
+            entry.PromptTokens = promptTok;
+            entry.CompletionTokens = completionTok;
+            entry.TotalTokens = promptTok + completionTok;
+
+            // Update session counters
+            _sessionRequestCount++;
+            _sessionTotalPromptTokens += promptTok;
+            _sessionTotalCompletionTokens += completionTok;
+            _sessionTotalTokens += promptTok + completionTok;
+            _sessionTotalTimeMs += elapsedMs;
+        }
+
+        private void DrawDebugPanel()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _debugFoldout = EditorGUILayout.Foldout(_debugFoldout, "Debug", true, _debugHeaderStyle);
+
+            if (_debugFoldout)
+            {
+                EditorGUI.indentLevel++;
+
+                // Session summary
+                EditorGUILayout.LabelField("Session", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    $"Requests: {_sessionRequestCount}   |   " +
+                    $"Tokens: {_sessionTotalTokens} (prompt: {_sessionTotalPromptTokens}, completion: {_sessionTotalCompletionTokens})   |   " +
+                    $"Time: {FormatDuration(_sessionTotalTimeMs)}",
+                    _debugStyle);
+
+                EditorGUILayout.Space(4);
+
+                // Per-message toggle
+                _debugShowPerMessage = EditorGUILayout.Toggle("Show per-message stats", _debugShowPerMessage);
+
+                if (_debugShowPerMessage)
+                {
+                    EditorGUILayout.Space(2);
+
+                    // Show debug info for each assistant entry that has it (most recent first)
+                    for (int i = _chatEntries.Count - 1; i >= 0; i--)
+                    {
+                        var entry = _chatEntries[i];
+                        if (entry.Type != ChatEntryType.Assistant || !entry.HasDebugInfo) continue;
+
+                        string contentPreview = entry.Content;
+                        if (contentPreview.Length > 50)
+                            contentPreview = contentPreview.Substring(0, 50) + "...";
+
+                        string tokLabel = entry.IsTokenEstimated
+                            ? $"~{entry.TotalTokens} tok (est.)"
+                            : $"{entry.TotalTokens} tok";
+
+                        string line = $"#{_chatEntries.Count - i}  " +
+                            $"{FormatDuration(entry.ElapsedMs)}  |  " +
+                            $"{tokLabel}  |  " +
+                            $"{entry.StepCount} step(s)  |  " +
+                            $"{entry.Model ?? "?"}  |  " +
+                            $"{entry.StopReason ?? "?"}";
+
+                        EditorGUILayout.LabelField(line, _debugStyle);
+                    }
+
+                    if (_chatEntries.All(e => e.Type != ChatEntryType.Assistant || !e.HasDebugInfo))
+                    {
+                        EditorGUILayout.LabelField("No request data yet.", _debugStyle);
+                    }
+                }
+
+                EditorGUILayout.Space(4);
+
+                // Raw JSON logging toggle
+                EditorGUI.BeginChangeCheck();
+                bool rawLog = EditorGUILayout.Toggle("Log raw JSON to file", UnaiLogger.RawJsonLoggingEnabled);
+                if (EditorGUI.EndChangeCheck())
+                    UnaiLogger.RawJsonLoggingEnabled = rawLog;
+
+                if (UnaiLogger.RawJsonLoggingEnabled)
+                {
+                    EditorGUILayout.LabelField(UnaiLogger.LogFilePath, _debugStyle);
+
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Space(14);
+                    if (GUILayout.Button("Open Log File", EditorStyles.miniButton, GUILayout.Width(100)))
+                    {
+                        if (System.IO.File.Exists(UnaiLogger.LogFilePath))
+                            EditorUtility.RevealInFinder(UnaiLogger.LogFilePath);
+                        else
+                            EditorUtility.DisplayDialog("UNAI", "No log file yet. Send a request first.", "OK");
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                EditorGUI.indentLevel--;
+
+                // Reset session button
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Reset Session Stats", EditorStyles.miniButton, GUILayout.Width(130)))
+                {
+                    _sessionRequestCount = 0;
+                    _sessionTotalPromptTokens = 0;
+                    _sessionTotalCompletionTokens = 0;
+                    _sessionTotalTokens = 0;
+                    _sessionTotalTimeMs = 0;
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private static string FormatDuration(float ms)
+        {
+            if (ms < 1000f) return $"{ms:F0}ms";
+            return $"{ms / 1000f:F2}s";
+        }
+
         private static string TruncateArgs(string json)
         {
             if (string.IsNullOrEmpty(json)) return "{}";
@@ -783,6 +996,17 @@ namespace UnAI.Editor.Assistant
             [SerializeField] public string Content;
             [SerializeField] public string ToolName;
             [SerializeField] public string ToolArgs;
+
+            // Debug metadata (populated on Assistant entries)
+            [SerializeField] public float ElapsedMs;
+            [SerializeField] public int PromptTokens;
+            [SerializeField] public int CompletionTokens;
+            [SerializeField] public int TotalTokens;
+            [SerializeField] public string Model;
+            [SerializeField] public int StepCount;
+            [SerializeField] public string StopReason;
+            [SerializeField] public bool HasDebugInfo;
+            [SerializeField] public bool IsTokenEstimated;
         }
     }
 }

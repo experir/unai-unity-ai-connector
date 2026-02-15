@@ -179,34 +179,62 @@ namespace UnAI.Providers.Anthropic
 
         protected override ISseLineParser CreateStreamParser()
         {
+            // Accumulate usage across streaming events:
+            // message_start has input_tokens, message_delta has output_tokens
+            int inputTokens = 0;
+            int outputTokens = 0;
+
             return new SseLineParser(
                 deltaFactory: (eventType, jsonData) =>
                 {
                     var root = JObject.Parse(jsonData);
                     string type = root["type"]?.ToString();
 
-                    return type switch
+                    switch (type)
                     {
-                        "content_block_delta" => new UnaiStreamDelta
+                        case "message_start":
                         {
-                            Content = root["delta"]?["text"]?.ToString() ?? "",
-                            EventType = type
-                        },
-                        "message_delta" => new UnaiStreamDelta
+                            var msgUsage = root["message"]?["usage"];
+                            if (msgUsage != null)
+                                inputTokens = msgUsage["input_tokens"]?.Value<int>() ?? 0;
+                            return null;
+                        }
+                        case "content_block_delta":
+                            return new UnaiStreamDelta
+                            {
+                                Content = root["delta"]?["text"]?.ToString() ?? "",
+                                EventType = type
+                            };
+                        case "message_delta":
                         {
-                            Content = "",
-                            IsFinal = true,
-                            FinishReason = root["delta"]?["stop_reason"]?.ToString(),
-                            EventType = type
-                        },
-                        "message_stop" => new UnaiStreamDelta
-                        {
-                            Content = "",
-                            IsFinal = true,
-                            EventType = type
-                        },
-                        _ => null
-                    };
+                            var deltaUsage = root["usage"];
+                            if (deltaUsage != null)
+                                outputTokens = deltaUsage["output_tokens"]?.Value<int>() ?? 0;
+
+                            return new UnaiStreamDelta
+                            {
+                                Content = "",
+                                IsFinal = true,
+                                FinishReason = root["delta"]?["stop_reason"]?.ToString(),
+                                EventType = type,
+                                Usage = new UnaiUsageInfo
+                                {
+                                    PromptTokens = inputTokens,
+                                    CompletionTokens = outputTokens,
+                                    TotalTokens = inputTokens + outputTokens
+                                }
+                            };
+                        }
+                        case "message_stop":
+                            return new UnaiStreamDelta
+                            {
+                                Content = "",
+                                IsFinal = true,
+                                EventType = type
+                            };
+                        default:
+                            return null;
+                    }
                 },
                 doneMarker: "__ANTHROPIC_NO_DONE__");
         }

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnAI.Models;
 using UnAI.Streaming;
+using UnAI.Utilities;
 using UnityEngine.Networking;
 
 namespace UnAI.Http
@@ -43,6 +44,10 @@ namespace UnAI.Http
             CancellationToken cancellationToken,
             TaskCompletionSource<bool> tcs)
         {
+            UnaiLogger.LogRawJson("STREAM_REQUEST", url, jsonBody);
+
+            string lastAccumulatedContent = null;
+
             byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
 
             using var request = new UnityWebRequest(url, "POST");
@@ -54,7 +59,11 @@ namespace UnAI.Http
                 {
                     var delta = lineParser.ProcessLine(line);
                     if (delta != null)
+                    {
+                        if (delta.AccumulatedContent != null)
+                            lastAccumulatedContent = delta.AccumulatedContent;
                         onDelta?.Invoke(delta);
+                    }
                 },
                 onComplete: () => { }
             );
@@ -86,11 +95,13 @@ namespace UnAI.Http
                 request.result == UnityWebRequest.Result.DataProcessingError)
             {
                 var errorInfo = UnaiHttpClient.CreateErrorFromRequest(request);
+                UnaiLogger.LogRawJson($"STREAM_ERROR [{(int)request.responseCode}]", url, errorInfo.RawResponse);
                 onError?.Invoke(errorInfo);
                 tcs.TrySetResult(false);
             }
             else
             {
+                UnaiLogger.LogRawJson("STREAM_COMPLETE", url, lastAccumulatedContent);
                 onComplete?.Invoke();
                 tcs.TrySetResult(true);
             }
