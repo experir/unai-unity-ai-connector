@@ -21,5 +21,12 @@ namespace UnAI.Models
 
         [JsonIgnore]
         public List<UnaiToolDefinition> Tools { get; set; }
+
+        /// <summary>
+        /// When true, the response may be served from cache if an identical
+        /// request was made recently. Only applies to non-streaming calls.
+        /// </summary>
+        [JsonIgnore]
+        public bool UseCache { get; set; }
     }
 }

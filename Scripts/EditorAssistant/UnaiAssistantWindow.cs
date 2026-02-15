@@ -893,6 +893,17 @@ namespace UnAI.Editor.Assistant
                     $"Time: {FormatDuration(_sessionTotalTimeMs)}",
                     _debugStyle);
 
+                // Cache stats (only shown when manager is available)
+                if (UnaiManager.Instance != null)
+                {
+                    var cache = UnaiManager.Instance.Cache;
+                    EditorGUILayout.LabelField(
+                        $"Cache: {cache.Count} entries   |   " +
+                        $"Hits: {cache.Hits}   |   Misses: {cache.Misses}   |   " +
+                        $"Hit rate: {cache.HitRate:P0}",
+                        _debugStyle);
+                }
+
                 EditorGUILayout.Space(4);
 
                 // Per-message toggle

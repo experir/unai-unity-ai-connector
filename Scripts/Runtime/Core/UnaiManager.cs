@@ -20,6 +20,12 @@ namespace UnAI.Core
 
         public UnaiGlobalConfig Config => _config;
 
+        /// <summary>
+        /// Response cache for non-streaming requests. Shared across all providers.
+        /// Use request.UseCache = true to opt in per request.
+        /// </summary>
+        public UnaiResponseCache Cache { get; } = new();
+
         public IUnaiProvider ActiveProvider =>
             UnaiProviderRegistry.Get(_activeProviderId ?? _config?.DefaultProviderId);
 
@@ -59,11 +65,27 @@ namespace UnAI.Core
             UnaiLogger.LogVerbose($"[UNAI] Active provider set to: {providerId}");
         }
 
-        public Task<UnaiChatResponse> ChatAsync(
+        public async Task<UnaiChatResponse> ChatAsync(
             UnaiChatRequest request,
             CancellationToken ct = default)
         {
-            return ActiveProvider.ChatAsync(request, ct);
+            var provider = ActiveProvider;
+
+            if (request.UseCache)
+            {
+                string key = UnaiResponseCache.BuildKey(provider.ProviderId, request);
+                if (Cache.TryGet(key, out var cached))
+                {
+                    UnaiLogger.LogVerbose($"[UNAI] Cache hit for request (key={key[..8]}...)");
+                    return cached;
+                }
+
+                var response = await provider.ChatAsync(request, ct);
+                Cache.Put(key, response);
+                return response;
+            }
+
+            return await provider.ChatAsync(request, ct);
         }
 
         public Task ChatStreamAsync(
@@ -79,14 +101,15 @@ namespace UnAI.Core
         public async Task<string> QuickChatAsync(
             string userMessage,
             string systemPrompt = null,
+            bool useCache = false,
             CancellationToken ct = default)
         {
-            var request = new UnaiChatRequest();
+            var request = new UnaiChatRequest { UseCache = useCache };
             if (!string.IsNullOrEmpty(systemPrompt))
                 request.Messages.Add(UnaiChatMessage.System(systemPrompt));
             request.Messages.Add(UnaiChatMessage.User(userMessage));
 
-            var response = await ActiveProvider.ChatAsync(request, ct);
+            var response = await ChatAsync(request, ct);
             return response.Content;
         }
 
