@@ -13,6 +13,10 @@ namespace UnAI.Config
         [Tooltip("Enable verbose debug logging.")]
         public bool DebugLogging;
 
+        [Tooltip("Ordered list of provider IDs to try when the active provider fails " +
+                 "(rate limit, server error, network error). Leave empty to disable fallback.")]
+        public List<string> FallbackProviderIds = new();
+
         [Header("Cloud Providers")]
         public UnaiProviderConfig OpenAI = new()
         {

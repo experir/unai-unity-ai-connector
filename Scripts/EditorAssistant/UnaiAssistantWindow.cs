@@ -54,6 +54,8 @@ namespace UnAI.Editor.Assistant
         // Debug panel state
         [SerializeField] private bool _debugFoldout;
         [SerializeField] private bool _debugShowPerMessage = true;
+        [SerializeField] private int _sessionFallbackCount;
+        [SerializeField] private string _lastFallbackInfo;
 
         // Per-request tracking (not serialized — transient during a single request)
         private float _requestStartTime;
@@ -281,6 +283,8 @@ namespace UnAI.Editor.Assistant
                 _sessionTotalCompletionTokens = 0;
                 _sessionTotalTokens = 0;
                 _sessionTotalTimeMs = 0;
+                _sessionFallbackCount = 0;
+                _lastFallbackInfo = null;
             }
 
             EditorGUILayout.EndHorizontal();
@@ -902,6 +906,13 @@ namespace UnAI.Editor.Assistant
                         $"Hits: {cache.Hits}   |   Misses: {cache.Misses}   |   " +
                         $"Hit rate: {cache.HitRate:P0}",
                         _debugStyle);
+                }
+
+                // Fallback chain info
+                if (_config?.FallbackProviderIds is { Count: > 0 })
+                {
+                    string chain = string.Join(" > ", _config.FallbackProviderIds);
+                    EditorGUILayout.LabelField($"Fallback chain: {chain}", _debugStyle);
                 }
 
                 EditorGUILayout.Space(4);
