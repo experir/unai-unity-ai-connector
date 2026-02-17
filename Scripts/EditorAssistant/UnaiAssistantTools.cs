@@ -1500,6 +1500,894 @@ namespace UnAI.Editor.Assistant
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  ADD COMPONENT CONFIGURED
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class AddComponentConfiguredTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "add_component_configured",
+            Description = "Add a component to a GameObject and configure its serialized properties in one call. " +
+                          "Properties are set via SerializedObject so any inspector-visible field can be changed. " +
+                          "Supports Undo.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""gameobject"": { ""type"": ""string"", ""description"": ""Name or path of the target GameObject"" },
+                    ""component"": { ""type"": ""string"", ""description"": ""Component type name (e.g. 'Rigidbody', 'BoxCollider', 'AudioSource')"" },
+                    ""properties"": {
+                        ""type"": ""object"",
+                        ""description"": ""Key-value pairs of property names and values to set (e.g. { 'mass': 5, 'useGravity': false, 'drag': 0.5 }). Property names match the inspector field names (camelCase or the serialized field name).""
+                    }
+                },
+                ""required"": [""gameobject"", ""component""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string goName = GetString(args, "gameobject", "gameObject", "name", "target", "object");
+            string compName = GetString(args, "component", "componentType", "component_type", "type");
+
+            if (string.IsNullOrEmpty(goName)) return "Error: 'gameobject' is required.";
+            if (string.IsNullOrEmpty(compName)) return "Error: 'component' is required.";
+
+            var go = GameObject.Find(goName);
+            if (go == null)
+                go = Resources.FindObjectsOfTypeAll<GameObject>()
+                    .FirstOrDefault(g => g.scene.isLoaded && g.name == goName);
+            if (go == null) return $"Error: GameObject '{goName}' not found.";
+
+            var type = FindComponentType(compName);
+            if (type == null) return $"Error: Component type '{compName}' not found.";
+
+            var existing = go.GetComponent(type);
+            Component comp;
+            if (existing != null)
+            {
+                comp = existing;
+            }
+            else
+            {
+                comp = Undo.AddComponent(go, type);
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine(existing != null
+                ? $"Configured existing '{type.Name}' on '{go.name}':"
+                : $"Added and configured '{type.Name}' on '{go.name}':");
+
+            var properties = args["properties"] as JObject;
+            if (properties != null && properties.Count > 0)
+            {
+                var so = new SerializedObject(comp);
+
+                foreach (var kvp in properties)
+                {
+                    string propName = kvp.Key;
+                    var value = kvp.Value;
+
+                    var prop = so.FindProperty(propName);
+                    if (prop == null)
+                    {
+                        // Try common Unity serialized field name patterns
+                        prop = so.FindProperty("m_" + char.ToUpper(propName[0]) + propName.Substring(1));
+                    }
+
+                    if (prop == null)
+                    {
+                        sb.AppendLine($"  Warning: Property '{propName}' not found on {type.Name}");
+                        continue;
+                    }
+
+                    if (SetPropertyValue(prop, value))
+                        sb.AppendLine($"  {propName} = {value}");
+                    else
+                        sb.AppendLine($"  Warning: Could not set '{propName}' (type: {prop.propertyType})");
+                }
+
+                so.ApplyModifiedProperties();
+            }
+
+            // List current property values
+            var soRead = new SerializedObject(comp);
+            var iter = soRead.GetIterator();
+            int shown = 0;
+            if (iter.NextVisible(true))
+            {
+                do
+                {
+                    if (iter.name == "m_Script") continue;
+                    sb.AppendLine($"  [{iter.displayName}: {GetPropertyDisplay(iter)}]");
+                    shown++;
+                } while (iter.NextVisible(false) && shown < 15);
+            }
+
+            return sb.ToString();
+        }
+
+        private bool SetPropertyValue(SerializedProperty prop, JToken value)
+        {
+            switch (prop.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                    prop.intValue = value.Value<int>();
+                    return true;
+                case SerializedPropertyType.Float:
+                    prop.floatValue = value.Value<float>();
+                    return true;
+                case SerializedPropertyType.Boolean:
+                    prop.boolValue = value.Value<bool>();
+                    return true;
+                case SerializedPropertyType.String:
+                    prop.stringValue = value.ToString();
+                    return true;
+                case SerializedPropertyType.Enum:
+                    if (value.Type == JTokenType.Integer)
+                        prop.enumValueIndex = value.Value<int>();
+                    else
+                    {
+                        string enumStr = value.ToString();
+                        int idx = Array.IndexOf(prop.enumDisplayNames, enumStr);
+                        if (idx < 0) idx = Array.FindIndex(prop.enumNames, n =>
+                            n.Equals(enumStr, StringComparison.OrdinalIgnoreCase));
+                        if (idx >= 0) prop.enumValueIndex = idx;
+                        else return false;
+                    }
+                    return true;
+                case SerializedPropertyType.Vector2:
+                    if (value is JObject v2)
+                    {
+                        prop.vector2Value = new Vector2(
+                            v2["x"]?.Value<float>() ?? 0,
+                            v2["y"]?.Value<float>() ?? 0);
+                        return true;
+                    }
+                    return false;
+                case SerializedPropertyType.Vector3:
+                    if (value is JObject v3)
+                    {
+                        prop.vector3Value = new Vector3(
+                            v3["x"]?.Value<float>() ?? 0,
+                            v3["y"]?.Value<float>() ?? 0,
+                            v3["z"]?.Value<float>() ?? 0);
+                        return true;
+                    }
+                    return false;
+                case SerializedPropertyType.Color:
+                    if (value is JObject col)
+                    {
+                        prop.colorValue = new Color(
+                            col["r"]?.Value<float>() ?? 1,
+                            col["g"]?.Value<float>() ?? 1,
+                            col["b"]?.Value<float>() ?? 1,
+                            col["a"]?.Value<float>() ?? 1);
+                        return true;
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        private string GetPropertyDisplay(SerializedProperty prop)
+        {
+            return prop.propertyType switch
+            {
+                SerializedPropertyType.Integer => prop.intValue.ToString(),
+                SerializedPropertyType.Float => prop.floatValue.ToString("F3"),
+                SerializedPropertyType.Boolean => prop.boolValue.ToString(),
+                SerializedPropertyType.String => $"\"{prop.stringValue}\"",
+                SerializedPropertyType.Enum => prop.enumValueIndex >= 0 && prop.enumValueIndex < prop.enumDisplayNames.Length
+                    ? prop.enumDisplayNames[prop.enumValueIndex] : prop.enumValueIndex.ToString(),
+                SerializedPropertyType.Vector3 => prop.vector3Value.ToString(),
+                SerializedPropertyType.Color => prop.colorValue.ToString(),
+                _ => $"({prop.propertyType})"
+            };
+        }
+
+        private Type FindComponentType(string name)
+        {
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var asm in assemblies)
+            {
+                var type = asm.GetTypes().FirstOrDefault(t =>
+                    t.Name.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                    typeof(Component).IsAssignableFrom(t));
+                if (type != null) return type;
+            }
+            return null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  CREATE LIGHT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class CreateLightTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "create_light",
+            Description = "Create a Light GameObject in the scene with full configuration. " +
+                          "Supports Directional, Point, Spot, and Area light types. Supports Undo.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""name"": { ""type"": ""string"", ""description"": ""Name for the light (default: 'New Light')"" },
+                    ""type"": { ""type"": ""string"", ""enum"": [""Directional"", ""Point"", ""Spot"", ""Area""], ""description"": ""Light type (default: Point)"" },
+                    ""color"": {
+                        ""type"": ""object"",
+                        ""properties"": {
+                            ""r"": { ""type"": ""number"" },
+                            ""g"": { ""type"": ""number"" },
+                            ""b"": { ""type"": ""number"" }
+                        },
+                        ""description"": ""Light color (RGB 0-1, default: white)""
+                    },
+                    ""intensity"": { ""type"": ""number"", ""description"": ""Light intensity (default: 1)"" },
+                    ""range"": { ""type"": ""number"", ""description"": ""Range for Point/Spot lights (default: 10)"" },
+                    ""spot_angle"": { ""type"": ""number"", ""description"": ""Spot angle in degrees for Spot lights (default: 30)"" },
+                    ""shadows"": { ""type"": ""string"", ""enum"": [""None"", ""Hard"", ""Soft""], ""description"": ""Shadow type (default: Soft)"" },
+                    ""position"": {
+                        ""type"": ""object"",
+                        ""properties"": {
+                            ""x"": { ""type"": ""number"" },
+                            ""y"": { ""type"": ""number"" },
+                            ""z"": { ""type"": ""number"" }
+                        },
+                        ""description"": ""World position""
+                    },
+                    ""rotation"": {
+                        ""type"": ""object"",
+                        ""properties"": {
+                            ""x"": { ""type"": ""number"" },
+                            ""y"": { ""type"": ""number"" },
+                            ""z"": { ""type"": ""number"" }
+                        },
+                        ""description"": ""Euler rotation""
+                    },
+                    ""parent"": { ""type"": ""string"", ""description"": ""Parent GameObject name (optional)"" }
+                }
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string name = GetString(args, "name") ?? "New Light";
+            string typeStr = GetString(args, "type", "lightType", "light_type") ?? "Point";
+
+            if (!Enum.TryParse<LightType>(typeStr, true, out var lightType))
+                return $"Error: Unknown light type '{typeStr}'. Use Directional, Point, Spot, or Area.";
+
+            var go = new GameObject(name);
+            Undo.RegisterCreatedObjectUndo(go, $"Create Light {name}");
+
+            var light = go.AddComponent<Light>();
+            light.type = lightType;
+
+            // Color
+            var colorToken = GetToken(args, "color");
+            if (colorToken is JObject col)
+            {
+                light.color = new Color(
+                    col["r"]?.Value<float>() ?? 1f,
+                    col["g"]?.Value<float>() ?? 1f,
+                    col["b"]?.Value<float>() ?? 1f);
+            }
+
+            // Intensity
+            var intensityToken = GetToken(args, "intensity");
+            if (intensityToken != null)
+                light.intensity = intensityToken.Value<float>();
+
+            // Range (Point/Spot)
+            var rangeToken = GetToken(args, "range");
+            if (rangeToken != null)
+                light.range = rangeToken.Value<float>();
+
+            // Spot angle
+            var spotToken = GetToken(args, "spot_angle", "spotAngle");
+            if (spotToken != null)
+                light.spotAngle = spotToken.Value<float>();
+
+            // Shadows
+            string shadowStr = GetString(args, "shadows", "shadow_type") ?? "Soft";
+            if (Enum.TryParse<LightShadows>(shadowStr, true, out var shadowType))
+                light.shadows = shadowType;
+
+            // Position
+            var pos = GetToken(args, "position");
+            if (pos is JObject posObj)
+            {
+                go.transform.position = new Vector3(
+                    posObj["x"]?.Value<float>() ?? 0,
+                    posObj["y"]?.Value<float>() ?? 0,
+                    posObj["z"]?.Value<float>() ?? 0);
+            }
+            else if (lightType == LightType.Directional)
+            {
+                go.transform.position = new Vector3(0, 3, 0);
+                go.transform.eulerAngles = new Vector3(50, -30, 0);
+            }
+            else
+            {
+                go.transform.position = new Vector3(0, 3, 0);
+            }
+
+            // Rotation
+            var rot = GetToken(args, "rotation");
+            if (rot is JObject rotObj)
+            {
+                go.transform.eulerAngles = new Vector3(
+                    rotObj["x"]?.Value<float>() ?? 0,
+                    rotObj["y"]?.Value<float>() ?? 0,
+                    rotObj["z"]?.Value<float>() ?? 0);
+            }
+
+            // Parent
+            string parentName = GetString(args, "parent");
+            if (!string.IsNullOrEmpty(parentName))
+            {
+                var parent = GameObject.Find(parentName);
+                if (parent != null)
+                    Undo.SetTransformParent(go.transform, parent.transform, $"Set parent of {name}");
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Created {lightType} light '{name}':");
+            sb.AppendLine($"  Color: {light.color}");
+            sb.AppendLine($"  Intensity: {light.intensity}");
+            if (lightType is LightType.Point or LightType.Spot)
+                sb.AppendLine($"  Range: {light.range}");
+            if (lightType == LightType.Spot)
+                sb.AppendLine($"  Spot Angle: {light.spotAngle}");
+            sb.AppendLine($"  Shadows: {light.shadows}");
+            sb.AppendLine($"  Position: {go.transform.position}");
+            sb.AppendLine($"  Rotation: {go.transform.eulerAngles}");
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  SEARCH PROJECT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class SearchProjectTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "search_project",
+            Description = "Full-text search across project scripts and text assets. " +
+                          "Finds files containing the search text and shows matching lines with context.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""query"": { ""type"": ""string"", ""description"": ""Text to search for (case-insensitive)"" },
+                    ""folder"": { ""type"": ""string"", ""description"": ""Folder to search in (default: 'Assets')"" },
+                    ""extension"": { ""type"": ""string"", ""description"": ""File extension filter (e.g. '.cs', '.shader', '.json'). Default: '.cs'"" },
+                    ""max_results"": { ""type"": ""integer"", ""description"": ""Maximum number of file matches to return (default: 20)"" }
+                },
+                ""required"": [""query""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string query = GetString(args, "query", "search", "text", "pattern");
+            if (string.IsNullOrEmpty(query)) return "Error: 'query' is required.";
+
+            string folder = GetString(args, "folder", "directory", "path") ?? "Assets";
+            string extension = GetString(args, "extension", "ext", "file_type") ?? ".cs";
+            int maxResults = args["max_results"]?.Value<int>() ?? 20;
+            maxResults = Mathf.Clamp(maxResults, 1, 50);
+
+            string fullFolder = folder.StartsWith("Assets")
+                ? System.IO.Path.Combine(Application.dataPath, "..", folder)
+                : System.IO.Path.Combine(Application.dataPath, folder);
+            fullFolder = System.IO.Path.GetFullPath(fullFolder);
+
+            if (!System.IO.Directory.Exists(fullFolder))
+                return $"Error: Folder '{folder}' not found.";
+
+            var files = System.IO.Directory.GetFiles(fullFolder, $"*{extension}", System.IO.SearchOption.AllDirectories);
+            var sb = new StringBuilder();
+            int matchCount = 0;
+
+            foreach (var file in files)
+            {
+                if (matchCount >= maxResults) break;
+
+                try
+                {
+                    string content = System.IO.File.ReadAllText(file);
+                    if (content.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                    matchCount++;
+                    string relativePath = file.Replace(
+                        System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..")),
+                        "").TrimStart(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+
+                    sb.AppendLine($"--- {relativePath} ---");
+
+                    var lines = content.Split('\n');
+                    int linesShown = 0;
+                    for (int i = 0; i < lines.Length && linesShown < 5; i++)
+                    {
+                        if (lines[i].IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            string trimmed = lines[i].TrimEnd('\r');
+                            if (trimmed.Length > 120)
+                                trimmed = trimmed.Substring(0, 120) + "...";
+                            sb.AppendLine($"  L{i + 1}: {trimmed}");
+                            linesShown++;
+                        }
+                    }
+                    sb.AppendLine();
+                }
+                catch
+                {
+                    // Skip files that can't be read
+                }
+            }
+
+            if (matchCount == 0)
+                return $"No matches found for '{query}' in {folder} ({extension} files).";
+
+            sb.Insert(0, $"Found '{query}' in {matchCount} file(s):\n\n");
+            if (matchCount >= maxResults)
+                sb.AppendLine($"... (limited to {maxResults} results)");
+
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  DUPLICATION & ORGANIZATION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class DuplicateGameObjectTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "duplicate_gameobject",
+            Description = "Duplicate (clone) a GameObject including all components and children. " +
+                          "Optionally rename the clone and set a new parent.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""name"": { ""type"": ""string"", ""description"": ""Name of the GameObject to duplicate"" },
+                    ""new_name"": { ""type"": ""string"", ""description"": ""Name for the clone (default: original name with (1) suffix)"" },
+                    ""parent"": { ""type"": ""string"", ""description"": ""Name of the parent to place the clone under"" },
+                    ""offset"": { ""type"": ""object"", ""description"": ""Position offset from original"",
+                        ""properties"": {
+                            ""x"": { ""type"": ""number"" },
+                            ""y"": { ""type"": ""number"" },
+                            ""z"": { ""type"": ""number"" }
+                        }
+                    }
+                },
+                ""required"": [""name""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string name = GetString(args, "name");
+            string newName = GetString(args, "new_name");
+            string parentName = GetString(args, "parent");
+            var offset = GetToken(args, "offset") as JObject;
+
+            var original = GameObject.Find(name);
+            if (original == null)
+                return $"Error: GameObject '{name}' not found.";
+
+            Undo.IncrementCurrentGroup();
+            var clone = UnityEngine.Object.Instantiate(original);
+            Undo.RegisterCreatedObjectUndo(clone, $"Duplicate {name}");
+
+            if (!string.IsNullOrEmpty(newName))
+                clone.name = newName;
+            else
+                clone.name = original.name; // Remove "(Clone)" suffix
+
+            if (!string.IsNullOrEmpty(parentName))
+            {
+                var parent = GameObject.Find(parentName);
+                if (parent != null)
+                    clone.transform.SetParent(parent.transform, true);
+            }
+
+            if (offset != null)
+            {
+                float ox = offset["x"]?.Value<float>() ?? 0f;
+                float oy = offset["y"]?.Value<float>() ?? 0f;
+                float oz = offset["z"]?.Value<float>() ?? 0f;
+                clone.transform.position = original.transform.position + new Vector3(ox, oy, oz);
+            }
+
+            int componentCount = clone.GetComponents<Component>().Length;
+            int childCount = clone.GetComponentsInChildren<Transform>(true).Length - 1;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Duplicated '{original.name}' as '{clone.name}'");
+            sb.AppendLine($"  Components: {componentCount}");
+            sb.AppendLine($"  Children: {childCount}");
+            sb.AppendLine($"  Position: {clone.transform.position}");
+            if (clone.transform.parent != null)
+                sb.AppendLine($"  Parent: {clone.transform.parent.name}");
+
+            return sb.ToString();
+        }
+    }
+
+    public class SetLayerTagTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "set_layer_tag",
+            Description = "Set the layer and/or tag on a GameObject. Optionally apply to all children recursively.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""name"": { ""type"": ""string"", ""description"": ""Name of the GameObject"" },
+                    ""layer"": { ""type"": ""string"", ""description"": ""Layer name to set (e.g. 'Water', 'UI', 'Ignore Raycast')"" },
+                    ""tag"": { ""type"": ""string"", ""description"": ""Tag to set (e.g. 'Player', 'Enemy', 'Respawn')"" },
+                    ""include_children"": { ""type"": ""boolean"", ""description"": ""Apply to all children recursively (default: false)"" }
+                },
+                ""required"": [""name""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string name = GetString(args, "name");
+            string layer = GetString(args, "layer");
+            string tag = GetString(args, "tag");
+            bool includeChildren = args["include_children"]?.Value<bool>() ?? false;
+
+            if (string.IsNullOrEmpty(layer) && string.IsNullOrEmpty(tag))
+                return "Error: At least one of 'layer' or 'tag' must be specified.";
+
+            var go = GameObject.Find(name);
+            if (go == null)
+                return $"Error: GameObject '{name}' not found.";
+
+            int layerIndex = -1;
+            if (!string.IsNullOrEmpty(layer))
+            {
+                layerIndex = LayerMask.NameToLayer(layer);
+                if (layerIndex < 0)
+                    return $"Error: Layer '{layer}' does not exist. Use Unity's Tags and Layers settings to add it.";
+            }
+
+            Undo.IncrementCurrentGroup();
+            var targets = includeChildren
+                ? go.GetComponentsInChildren<Transform>(true).Select(t => t.gameObject).ToArray()
+                : new[] { go };
+
+            int count = 0;
+            foreach (var target in targets)
+            {
+                Undo.RecordObject(target, "Set Layer/Tag");
+                if (layerIndex >= 0)
+                    target.layer = layerIndex;
+                if (!string.IsNullOrEmpty(tag))
+                    target.tag = tag;
+                count++;
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Updated {count} GameObject(s):");
+            if (!string.IsNullOrEmpty(layer))
+                sb.AppendLine($"  Layer: {layer} (index {layerIndex})");
+            if (!string.IsNullOrEmpty(tag))
+                sb.AppendLine($"  Tag: {tag}");
+            if (includeChildren)
+                sb.AppendLine($"  (Applied recursively to {count - 1} children)");
+
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PROJECT SETTINGS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class GetProjectSettingsTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "get_project_settings",
+            Description = "Read Unity project settings: Physics, Quality, Time, or Player settings.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""category"": { ""type"": ""string"", ""description"": ""Settings category: 'physics', 'quality', 'time', or 'player'"" }
+                },
+                ""required"": [""category""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string category = GetString(args, "category")?.ToLowerInvariant();
+
+            return category switch
+            {
+                "physics" => GetPhysicsSettings(),
+                "quality" => GetQualitySettings(),
+                "time" => GetTimeSettings(),
+                "player" => GetPlayerSettings(),
+                _ => $"Error: Unknown category '{category}'. Use 'physics', 'quality', 'time', or 'player'."
+            };
+        }
+
+        private string GetPhysicsSettings()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Physics Settings ===");
+            sb.AppendLine($"  Gravity: {Physics.gravity}");
+            sb.AppendLine($"  Default solver iterations: {Physics.defaultSolverIterations}");
+            sb.AppendLine($"  Default solver velocity iterations: {Physics.defaultSolverVelocityIterations}");
+            sb.AppendLine($"  Bounce threshold: {Physics.bounceThreshold}");
+            sb.AppendLine($"  Default contact offset: {Physics.defaultContactOffset}");
+            sb.AppendLine($"  Sleep threshold: {Physics.sleepThreshold}");
+            sb.AppendLine($"  Auto-sync transforms: {Physics.autoSyncTransforms}");
+
+            // Layer collision matrix — show which layers collide
+            sb.AppendLine("  Layer collision matrix (non-default):");
+            int layerCount = 0;
+            for (int i = 0; i < 32; i++)
+            {
+                string ln = LayerMask.LayerToName(i);
+                if (string.IsNullOrEmpty(ln)) continue;
+                for (int j = i; j < 32; j++)
+                {
+                    string ln2 = LayerMask.LayerToName(j);
+                    if (string.IsNullOrEmpty(ln2)) continue;
+                    if (!Physics.GetIgnoreLayerCollision(i, j)) continue;
+                    sb.AppendLine($"    {ln} <-> {ln2}: IGNORED");
+                    layerCount++;
+                }
+            }
+            if (layerCount == 0) sb.AppendLine("    (all layers collide with each other)");
+
+            return sb.ToString();
+        }
+
+        private string GetQualitySettings()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Quality Settings ===");
+            var names = QualitySettings.names;
+            sb.AppendLine($"  Current level: {names[QualitySettings.GetQualityLevel()]} (index {QualitySettings.GetQualityLevel()})");
+            sb.AppendLine($"  All levels: {string.Join(", ", names)}");
+            sb.AppendLine($"  VSync count: {QualitySettings.vSyncCount}");
+            sb.AppendLine($"  Anti-aliasing: {QualitySettings.antiAliasing}x");
+            sb.AppendLine($"  Shadow distance: {QualitySettings.shadowDistance}");
+            sb.AppendLine($"  Shadow resolution: {QualitySettings.shadowResolution}");
+            sb.AppendLine($"  Texture quality: {QualitySettings.globalTextureMipmapLimit}");
+            sb.AppendLine($"  Anisotropic filtering: {QualitySettings.anisotropicFiltering}");
+            sb.AppendLine($"  LOD bias: {QualitySettings.lodBias}");
+            sb.AppendLine($"  Particle raycast budget: {QualitySettings.particleRaycastBudget}");
+            return sb.ToString();
+        }
+
+        private string GetTimeSettings()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Time Settings ===");
+            sb.AppendLine($"  Fixed timestep: {Time.fixedDeltaTime}");
+            sb.AppendLine($"  Maximum allowed timestep: {Time.maximumDeltaTime}");
+            sb.AppendLine($"  Time scale: {Time.timeScale}");
+            sb.AppendLine($"  Maximum particle timestep: {Time.maximumParticleDeltaTime}");
+            return sb.ToString();
+        }
+
+        private string GetPlayerSettings()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Player Settings ===");
+            sb.AppendLine($"  Product name: {PlayerSettings.productName}");
+            sb.AppendLine($"  Company name: {PlayerSettings.companyName}");
+            sb.AppendLine($"  Bundle version: {PlayerSettings.bundleVersion}");
+            sb.AppendLine($"  Default screen width: {PlayerSettings.defaultScreenWidth}");
+            sb.AppendLine($"  Default screen height: {PlayerSettings.defaultScreenHeight}");
+            sb.AppendLine($"  Fullscreen mode: {PlayerSettings.fullScreenMode}");
+            sb.AppendLine($"  Run in background: {PlayerSettings.runInBackground}");
+            sb.AppendLine($"  Color space: {PlayerSettings.colorSpace}");
+            sb.AppendLine($"  Scripting backend: {PlayerSettings.GetScriptingBackend(EditorUserBuildSettings.selectedBuildTargetGroup)}");
+            sb.AppendLine($"  API compatibility: {PlayerSettings.GetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup)}");
+            sb.AppendLine($"  Target platform: {EditorUserBuildSettings.activeBuildTarget}");
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  SCENE VIEW
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class FocusSceneViewTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "focus_scene_view",
+            Description = "Focus the Scene View camera on a specific GameObject (equivalent to pressing F in the editor).",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""name"": { ""type"": ""string"", ""description"": ""Name of the GameObject to focus on"" }
+                },
+                ""required"": [""name""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string name = GetString(args, "name");
+
+            var go = GameObject.Find(name);
+            if (go == null)
+                return $"Error: GameObject '{name}' not found.";
+
+            // Select the object and frame it in the Scene View
+            Selection.activeGameObject = go;
+            SceneView sceneView = SceneView.lastActiveSceneView;
+            if (sceneView != null)
+            {
+                sceneView.FrameSelected();
+                sceneView.Repaint();
+                return $"Focused Scene View on '{name}' at position {go.transform.position}.";
+            }
+
+            return $"Selected '{name}' but no Scene View is currently open. Open Window > General > Scene to see it.";
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PHYSICS SETUP
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class CreatePhysicsSetupTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "create_physics_setup",
+            Description = "Add a complete physics setup to a GameObject: Rigidbody + Collider + optional PhysicMaterial, in one call.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""name"": { ""type"": ""string"", ""description"": ""Name of the target GameObject"" },
+                    ""collider"": { ""type"": ""string"", ""description"": ""Collider type: 'box', 'sphere', 'capsule', 'mesh' (default: 'box')"" },
+                    ""is_trigger"": { ""type"": ""boolean"", ""description"": ""Set collider as trigger (default: false)"" },
+                    ""mass"": { ""type"": ""number"", ""description"": ""Rigidbody mass (default: 1)"" },
+                    ""drag"": { ""type"": ""number"", ""description"": ""Rigidbody drag (default: 0)"" },
+                    ""angular_drag"": { ""type"": ""number"", ""description"": ""Rigidbody angular drag (default: 0.05)"" },
+                    ""use_gravity"": { ""type"": ""boolean"", ""description"": ""Enable gravity (default: true)"" },
+                    ""is_kinematic"": { ""type"": ""boolean"", ""description"": ""Set as kinematic (default: false)"" },
+                    ""freeze_position"": { ""type"": ""array"", ""items"": { ""type"": ""string"" }, ""description"": ""Axes to freeze position: ['x','y','z']"" },
+                    ""freeze_rotation"": { ""type"": ""array"", ""items"": { ""type"": ""string"" }, ""description"": ""Axes to freeze rotation: ['x','y','z']"" },
+                    ""bounciness"": { ""type"": ""number"", ""description"": ""PhysicMaterial bounciness (0-1). Only created if specified."" },
+                    ""friction"": { ""type"": ""number"", ""description"": ""PhysicMaterial dynamic friction (0-1)"" }
+                },
+                ""required"": [""name""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string name = GetString(args, "name");
+            string colliderType = GetString(args, "collider", "collider_type") ?? "box";
+            bool isTrigger = args["is_trigger"]?.Value<bool>() ?? false;
+            float mass = args["mass"]?.Value<float>() ?? 1f;
+            float drag = args["drag"]?.Value<float>() ?? 0f;
+            float angularDrag = args["angular_drag"]?.Value<float>() ?? 0.05f;
+            bool useGravity = args["use_gravity"]?.Value<bool>() ?? true;
+            bool isKinematic = args["is_kinematic"]?.Value<bool>() ?? false;
+
+            var go = GameObject.Find(name);
+            if (go == null)
+                return $"Error: GameObject '{name}' not found.";
+
+            Undo.IncrementCurrentGroup();
+            var sb = new StringBuilder();
+            sb.AppendLine($"Physics setup for '{name}':");
+
+            // Add Collider
+            Collider collider;
+            switch (colliderType.ToLowerInvariant())
+            {
+                case "sphere":
+                    collider = Undo.AddComponent<SphereCollider>(go);
+                    sb.AppendLine($"  + SphereCollider");
+                    break;
+                case "capsule":
+                    collider = Undo.AddComponent<CapsuleCollider>(go);
+                    sb.AppendLine($"  + CapsuleCollider");
+                    break;
+                case "mesh":
+                    collider = Undo.AddComponent<MeshCollider>(go);
+                    if (collider is MeshCollider mc)
+                        mc.convex = true; // Required for Rigidbody
+                    sb.AppendLine($"  + MeshCollider (convex)");
+                    break;
+                default:
+                    collider = Undo.AddComponent<BoxCollider>(go);
+                    sb.AppendLine($"  + BoxCollider");
+                    break;
+            }
+
+            if (isTrigger && collider != null)
+            {
+                collider.isTrigger = true;
+                sb.AppendLine($"    isTrigger: true");
+            }
+
+            // PhysicMaterial (only if bounciness or friction specified)
+            var bouncinessToken = GetToken(args, "bounciness");
+            var frictionToken = GetToken(args, "friction");
+            if (bouncinessToken != null || frictionToken != null)
+            {
+                var mat = new PhysicMaterial($"{name}_PhysMat");
+                if (bouncinessToken != null)
+                    mat.bounciness = bouncinessToken.Value<float>();
+                if (frictionToken != null)
+                    mat.dynamicFriction = frictionToken.Value<float>();
+                if (collider != null)
+                    collider.material = mat;
+                sb.AppendLine($"  + PhysicMaterial (bounce: {mat.bounciness}, friction: {mat.dynamicFriction})");
+            }
+
+            // Add Rigidbody
+            var rb = Undo.AddComponent<Rigidbody>(go);
+            rb.mass = mass;
+            rb.linearDamping = drag;
+            rb.angularDamping = angularDrag;
+            rb.useGravity = useGravity;
+            rb.isKinematic = isKinematic;
+
+            // Freeze constraints
+            RigidbodyConstraints constraints = RigidbodyConstraints.None;
+            var freezePos = args["freeze_position"] as JArray;
+            var freezeRot = args["freeze_rotation"] as JArray;
+            if (freezePos != null)
+            {
+                foreach (var axis in freezePos)
+                {
+                    switch (axis.ToString().ToLowerInvariant())
+                    {
+                        case "x": constraints |= RigidbodyConstraints.FreezePositionX; break;
+                        case "y": constraints |= RigidbodyConstraints.FreezePositionY; break;
+                        case "z": constraints |= RigidbodyConstraints.FreezePositionZ; break;
+                    }
+                }
+            }
+            if (freezeRot != null)
+            {
+                foreach (var axis in freezeRot)
+                {
+                    switch (axis.ToString().ToLowerInvariant())
+                    {
+                        case "x": constraints |= RigidbodyConstraints.FreezeRotationX; break;
+                        case "y": constraints |= RigidbodyConstraints.FreezeRotationY; break;
+                        case "z": constraints |= RigidbodyConstraints.FreezeRotationZ; break;
+                    }
+                }
+            }
+            rb.constraints = constraints;
+
+            sb.AppendLine($"  + Rigidbody (mass: {mass}, drag: {drag}, angularDrag: {angularDrag})");
+            sb.AppendLine($"    useGravity: {useGravity}, isKinematic: {isKinematic}");
+            if (constraints != RigidbodyConstraints.None)
+                sb.AppendLine($"    constraints: {constraints}");
+
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  TOOL REGISTRY
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1520,14 +2408,32 @@ namespace UnAI.Editor.Assistant
             registry.Register(new InspectGameObjectTool());
             registry.Register(new CreatePrefabTool());
 
-            // Materials
+            // Materials & Lighting
             registry.Register(new CreateMaterialTool());
+            registry.Register(new CreateLightTool());
+
+            // Components
+            registry.Register(new AddComponentConfiguredTool());
 
             // Scripts & Assets
             registry.Register(new ReadScriptTool());
             registry.Register(new CreateScriptTool());
             registry.Register(new ModifyScriptTool());
             registry.Register(new ListAssetsTool());
+            registry.Register(new SearchProjectTool());
+
+            // Duplication & organization
+            registry.Register(new DuplicateGameObjectTool());
+            registry.Register(new SetLayerTagTool());
+
+            // Project settings
+            registry.Register(new GetProjectSettingsTool());
+
+            // Scene view
+            registry.Register(new FocusSceneViewTool());
+
+            // Physics
+            registry.Register(new CreatePhysicsSetupTool());
 
             // Editor control
             registry.Register(new ExecuteMenuItemTool());

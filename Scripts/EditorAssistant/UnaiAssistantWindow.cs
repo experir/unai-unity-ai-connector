@@ -307,8 +307,9 @@ namespace UnAI.Editor.Assistant
                 EditorGUILayout.Space(8);
 
                 string tools = "inspect_scene, find_gameobject, create_gameobject,\n" +
-                               "inspect_gameobject, read_script, list_assets,\n" +
-                               "get_selection, log_message";
+                               "inspect_gameobject, create_light, create_physics_setup,\n" +
+                               "duplicate_gameobject, search_project, read_script,\n" +
+                               "list_assets, get_project_settings, and more (24 tools)";
                 EditorGUILayout.LabelField("Available tools:", EditorStyles.centeredGreyMiniLabel);
                 EditorGUILayout.LabelField(tools,
                     new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true, fontSize = 10 });
@@ -830,8 +831,10 @@ namespace UnAI.Editor.Assistant
                 "AVAILABLE TOOLS:\n" +
                 "- 'create_gameobject': Create GameObjects (supports 'components' list like ['Rigidbody', 'Camera', 'Light'])\n" +
                 "- 'modify_gameobject': Transform, rename, add/remove components, delete existing GameObjects\n" +
+                "- 'add_component_configured': Add a component and set its properties in one call (e.g. Rigidbody with mass=5, useGravity=false)\n" +
                 "- 'create_prefab': Save a scene GameObject as a Prefab asset\n" +
                 "- 'create_material': Create materials with color, shader, metallic, emission, and optionally apply to a GameObject\n" +
+                "- 'create_light': Create lights (Directional, Point, Spot, Area) with color, intensity, range, shadows\n" +
                 "- 'create_script': Create new C# scripts with 'path' and 'content'\n" +
                 "- 'modify_script': Edit existing scripts (find/replace, insert at line, or overwrite)\n" +
                 "- 'read_script': Read C# file contents\n" +
@@ -839,6 +842,12 @@ namespace UnAI.Editor.Assistant
                 "- 'find_gameobject': Search for GameObjects by name, tag, or component\n" +
                 "- 'inspect_gameobject': Get detailed info about a specific GameObject\n" +
                 "- 'list_assets': List project assets by folder and type\n" +
+                "- 'search_project': Full-text search across project scripts and text assets\n" +
+                "- 'duplicate_gameobject': Clone a GameObject with all components and children, optionally rename and reparent\n" +
+                "- 'set_layer_tag': Set layer and/or tag on a GameObject, optionally recursive to children\n" +
+                "- 'get_project_settings': Read Unity project settings (physics, quality, time, player)\n" +
+                "- 'focus_scene_view': Focus the Scene View camera on a specific GameObject\n" +
+                "- 'create_physics_setup': Add Rigidbody + Collider + PhysicMaterial in one call\n" +
                 "- 'get_selection': Get currently selected objects\n" +
                 "- 'execute_menu_item': Run any Unity menu command (e.g. 'GameObject/Light/Directional Light')\n" +
                 "- 'undo': Undo previous action(s)\n" +
