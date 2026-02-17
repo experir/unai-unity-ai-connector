@@ -56,6 +56,7 @@ namespace UnAI.Editor.Assistant
         [SerializeField] private bool _debugShowPerMessage = true;
         [SerializeField] private int _sessionFallbackCount;
         [SerializeField] private string _lastFallbackInfo;
+        [SerializeField] private bool _autoSaveEnabled;
 
         // Per-request tracking (not serialized — transient during a single request)
         private float _requestStartTime;
@@ -500,6 +501,7 @@ namespace UnAI.Editor.Assistant
                 _streamingContent = "";
                 _scrollToBottom = true;
                 SaveConversationState();
+                AutoSaveIfEnabled();
                 Repaint();
             }
         }
@@ -801,6 +803,7 @@ namespace UnAI.Editor.Assistant
                 _streamingContent = "";
                 _scrollToBottom = true;
                 SaveConversationState();
+                AutoSaveIfEnabled();
                 Repaint();
             }
         }
@@ -837,6 +840,25 @@ namespace UnAI.Editor.Assistant
                 "- 'log_message': Write to Unity Console\n\n" +
                 "WORKFLOW: Think about what tools you need, then call them one by one. " +
                 "After all tool calls are done, give a brief summary of what was accomplished.";
+        }
+
+        private static readonly string AutoSavePath =
+            System.IO.Path.Combine(Application.dataPath, "..", "Library", "UnAI", "autosave.json");
+
+        private void AutoSaveIfEnabled()
+        {
+            if (!_autoSaveEnabled) return;
+            if (_agent?.Conversation == null || _agent.Conversation.MessageCount == 0) return;
+
+            try
+            {
+                _agent.Conversation.SaveToFile(AutoSavePath);
+                UnaiLogger.LogVerbose($"[UNAI] Auto-saved conversation to: {AutoSavePath}");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[UNAI] Auto-save failed: {ex.Message}");
+            }
         }
 
         private void PopulateDebugInfo(ChatEntry entry, UnaiAgentStep step, float elapsedMs)
@@ -977,6 +999,84 @@ namespace UnAI.Editor.Assistant
                     }
                     EditorGUILayout.EndHorizontal();
                 }
+
+                EditorGUILayout.Space(4);
+
+                // Conversation persistence
+                EditorGUILayout.LabelField("Conversation", EditorStyles.boldLabel);
+
+                _autoSaveEnabled = EditorGUILayout.Toggle("Auto-save after each request", _autoSaveEnabled);
+
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(14);
+
+                GUI.enabled = _agent?.Conversation != null && _agent.Conversation.MessageCount > 0;
+
+                if (GUILayout.Button("Save JSON", EditorStyles.miniButton, GUILayout.Width(75)))
+                {
+                    string path = EditorUtility.SaveFilePanel(
+                        "Save Conversation", "", "conversation.json", "json");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        _agent.Conversation.SaveToFile(path);
+                        Debug.Log($"[UNAI] Conversation saved to: {path}");
+                    }
+                }
+
+                if (GUILayout.Button("Export MD", EditorStyles.miniButton, GUILayout.Width(75)))
+                {
+                    string path = EditorUtility.SaveFilePanel(
+                        "Export Conversation as Markdown", "", "conversation.md", "md");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        System.IO.File.WriteAllText(path, _agent.Conversation.ExportMarkdown());
+                        Debug.Log($"[UNAI] Conversation exported to: {path}");
+                    }
+                }
+
+                GUI.enabled = true;
+
+                if (GUILayout.Button("Load JSON", EditorStyles.miniButton, GUILayout.Width(75)))
+                {
+                    string path = EditorUtility.OpenFilePanel(
+                        "Load Conversation", "", "json");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        EnsureAgent();
+                        _agent.Conversation.LoadFromFile(path);
+
+                        // Rebuild chat entries from loaded messages
+                        _chatEntries.Clear();
+                        foreach (var msg in _agent.Conversation.Messages)
+                        {
+                            switch (msg.Role)
+                            {
+                                case UnaiRole.User:
+                                    _chatEntries.Add(new ChatEntry
+                                        { Type = ChatEntryType.User, Content = msg.Content });
+                                    break;
+                                case UnaiRole.Assistant:
+                                    _chatEntries.Add(new ChatEntry
+                                        { Type = ChatEntryType.Assistant, Content = msg.Content });
+                                    break;
+                                case UnaiRole.Tool:
+                                    _chatEntries.Add(new ChatEntry
+                                    {
+                                        Type = ChatEntryType.ToolResult,
+                                        ToolName = msg.ToolName,
+                                        Content = msg.Content
+                                    });
+                                    break;
+                            }
+                        }
+
+                        _scrollToBottom = true;
+                        Debug.Log($"[UNAI] Conversation loaded from: {path} ({_agent.Conversation.MessageCount} messages)");
+                        Repaint();
+                    }
+                }
+
+                EditorGUILayout.EndHorizontal();
 
                 EditorGUI.indentLevel--;
 
