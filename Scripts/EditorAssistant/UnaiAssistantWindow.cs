@@ -925,6 +925,12 @@ namespace UnAI.Editor.Assistant
                     $"Time: {FormatDuration(_sessionTotalTimeMs)}",
                     _debugStyle);
 
+                // Provider init stats
+                EditorGUILayout.LabelField(
+                    $"Providers: {UnaiProviderRegistry.InitializedCount} initialized   |   " +
+                    $"{UnaiProviderRegistry.PendingCount} pending (lazy)",
+                    _debugStyle);
+
                 // Cache stats (only shown when manager is available)
                 if (UnaiManager.Instance != null)
                 {
