@@ -35,6 +35,9 @@ namespace UnAI.Examples
         [SerializeField] private Button _debugToggleButton;
         [SerializeField] private TMP_Text _debugText;
 
+        [Header("Response Format (Optional)")]
+        [SerializeField] private TMP_Dropdown _responseFormatDropdown;
+
         private string[] _providerIds = Array.Empty<string>();
         private readonly List<string> _logEntries = new();
         private CancellationTokenSource _cts;
@@ -60,6 +63,7 @@ namespace UnAI.Examples
             _responseText.text = "";
 
             SetupDebugPanel();
+            SetupResponseFormatDropdown();
 
             Log("UNAI Example Chat ready.");
             Log("Set environment variables (OPENAI_API_KEY, etc.) or configure keys in the UnaiGlobalConfig asset.");
@@ -118,6 +122,14 @@ namespace UnAI.Examples
             });
 
             UpdateButtonStates();
+        }
+
+        private void SetupResponseFormatDropdown()
+        {
+            if (_responseFormatDropdown == null) return;
+            _responseFormatDropdown.ClearOptions();
+            _responseFormatDropdown.AddOptions(new List<string> { "Text", "JSON Object", "JSON Schema" });
+            _responseFormatDropdown.value = 0;
         }
 
         private void SetupDebugPanel()
@@ -183,6 +195,11 @@ namespace UnAI.Examples
             float startTime = Time.realtimeSinceStartup;
 
             var request = new UnaiChatRequest();
+
+            int formatIdx = _responseFormatDropdown != null ? _responseFormatDropdown.value : 0;
+            if (formatIdx > 0)
+                request.Options = new UnaiRequestOptions { ResponseFormat = (UnaiResponseFormat)formatIdx };
+
             string sys = _systemPromptInput.text.Trim();
             if (!string.IsNullOrEmpty(sys))
                 request.Messages.Add(UnaiChatMessage.System(sys));

@@ -87,6 +87,24 @@ namespace UnAI.Providers
                 if (request.Options.StopSequences is { Length: > 0 })
                     obj["stop"] = JArray.FromObject(request.Options.StopSequences);
 
+                if (request.Options.ResponseFormat == UnaiResponseFormat.JsonObject)
+                {
+                    obj["response_format"] = new JObject { ["type"] = "json_object" };
+                }
+                else if (request.Options.ResponseFormat == UnaiResponseFormat.JsonSchema)
+                {
+                    var rf = new JObject { ["type"] = "json_schema" };
+                    var schemaObj = new JObject
+                    {
+                        ["name"] = request.Options.JsonSchemaName ?? "response",
+                        ["strict"] = true
+                    };
+                    if (request.Options.JsonSchema != null)
+                        schemaObj["schema"] = request.Options.JsonSchema;
+                    rf["json_schema"] = schemaObj;
+                    obj["response_format"] = rf;
+                }
+
                 if (request.Options.ExtraParameters != null)
                 {
                     foreach (var kvp in request.Options.ExtraParameters)

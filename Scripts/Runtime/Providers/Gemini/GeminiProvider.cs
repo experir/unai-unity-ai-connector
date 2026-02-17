@@ -141,6 +141,13 @@ namespace UnAI.Providers.Gemini
             if (request.Options?.StopSequences is { Length: > 0 })
                 genConfig["stopSequences"] = JArray.FromObject(request.Options.StopSequences);
 
+            if (request.Options?.ResponseFormat is UnaiResponseFormat.JsonObject or UnaiResponseFormat.JsonSchema)
+            {
+                genConfig["responseMimeType"] = "application/json";
+                if (request.Options.ResponseFormat == UnaiResponseFormat.JsonSchema && request.Options.JsonSchema != null)
+                    genConfig["responseSchema"] = request.Options.JsonSchema;
+            }
+
             if (genConfig.Count > 0)
                 obj["generationConfig"] = genConfig;
 

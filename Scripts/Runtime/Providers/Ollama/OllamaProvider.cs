@@ -93,6 +93,15 @@ namespace UnAI.Providers.Ollama
                 obj["tools"] = toolsArray;
             }
 
+            if (request.Options?.ResponseFormat is UnaiResponseFormat.JsonObject)
+            {
+                obj["format"] = "json";
+            }
+            else if (request.Options?.ResponseFormat == UnaiResponseFormat.JsonSchema && request.Options.JsonSchema != null)
+            {
+                obj["format"] = request.Options.JsonSchema;
+            }
+
             if (request.Options != null)
             {
                 var options = new JObject();

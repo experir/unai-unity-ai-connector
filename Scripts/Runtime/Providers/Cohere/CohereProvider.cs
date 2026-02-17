@@ -68,6 +68,14 @@ namespace UnAI.Providers.Cohere
             if (request.Options?.StopSequences is { Length: > 0 })
                 obj["stop_sequences"] = JArray.FromObject(request.Options.StopSequences);
 
+            if (request.Options?.ResponseFormat is UnaiResponseFormat.JsonObject or UnaiResponseFormat.JsonSchema)
+            {
+                var rf = new JObject { ["type"] = "json_object" };
+                if (request.Options.ResponseFormat == UnaiResponseFormat.JsonSchema && request.Options.JsonSchema != null)
+                    rf["json_schema"] = request.Options.JsonSchema;
+                obj["response_format"] = rf;
+            }
+
             return obj.ToString(Newtonsoft.Json.Formatting.None);
         }
 

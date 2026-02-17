@@ -57,6 +57,7 @@ namespace UnAI.Editor.Assistant
         [SerializeField] private int _sessionFallbackCount;
         [SerializeField] private string _lastFallbackInfo;
         [SerializeField] private bool _autoSaveEnabled;
+        [SerializeField] private int _responseFormatIndex; // 0=Text, 1=JsonObject, 2=JsonSchema
 
         // Per-request tracking (not serialized — transient during a single request)
         private float _requestStartTime;
@@ -519,6 +520,10 @@ namespace UnAI.Editor.Assistant
 
             var tools = UnaiAssistantToolsFactory.CreateEditorToolRegistry();
 
+            var options = new UnaiRequestOptions();
+            if (_responseFormatIndex > 0)
+                options.ResponseFormat = (UnaiResponseFormat)_responseFormatIndex;
+
             var config = new UnaiAgentConfig
             {
                 ProviderId = providerId,
@@ -526,7 +531,8 @@ namespace UnAI.Editor.Assistant
                 MaxSteps = _maxSteps,
                 TimeoutSeconds = 120,
                 UseStreaming = true,
-                SystemPrompt = BuildSystemPrompt()
+                SystemPrompt = BuildSystemPrompt(),
+                Options = options.ResponseFormat != UnaiResponseFormat.Text ? options : null
             };
 
             _agent = new UnaiAgent(config, tools);
@@ -999,6 +1005,16 @@ namespace UnAI.Editor.Assistant
                     }
                     EditorGUILayout.EndHorizontal();
                 }
+
+                EditorGUILayout.Space(4);
+
+                // Response format
+                EditorGUILayout.LabelField("Request Options", EditorStyles.boldLabel);
+                EditorGUI.BeginChangeCheck();
+                _responseFormatIndex = EditorGUILayout.Popup("Response Format",
+                    _responseFormatIndex, new[] { "Text", "JSON Object", "JSON Schema" });
+                if (EditorGUI.EndChangeCheck())
+                    ResetAgent();
 
                 EditorGUILayout.Space(4);
 

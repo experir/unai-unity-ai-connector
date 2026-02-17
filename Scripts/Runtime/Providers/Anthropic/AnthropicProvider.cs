@@ -49,8 +49,18 @@ namespace UnAI.Providers.Anthropic
             };
 
             var systemMsg = request.Messages.FirstOrDefault(m => m.Role == UnaiRole.System);
-            if (systemMsg != null)
-                obj["system"] = systemMsg.Content;
+            string systemContent = systemMsg?.Content;
+
+            if (request.Options?.ResponseFormat is UnaiResponseFormat.JsonObject or UnaiResponseFormat.JsonSchema)
+            {
+                string jsonHint = "\n\nYou must respond with valid JSON only. No markdown, no explanation — just the JSON object.";
+                if (request.Options.ResponseFormat == UnaiResponseFormat.JsonSchema && request.Options.JsonSchema != null)
+                    jsonHint += $"\n\nRespond according to this JSON schema:\n{request.Options.JsonSchema.ToString(Formatting.Indented)}";
+                systemContent = (systemContent ?? "") + jsonHint;
+            }
+
+            if (!string.IsNullOrEmpty(systemContent))
+                obj["system"] = systemContent;
 
             if (request.Tools is { Count: > 0 })
             {
