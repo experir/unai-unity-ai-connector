@@ -3,7 +3,8 @@
     "rootNamespace": "UnAI.Editor.Assistant",
     "references": [
         "UnAI.Runtime",
-        "UnAI.Agent"
+        "UnAI.Agent",
+        "UnAI.MCP"
     ],
     "includePlatforms": [
         "Editor"

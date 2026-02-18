@@ -8,6 +8,7 @@ using UnAI.Core;
 using UnAI.Memory;
 using UnAI.Models;
 using UnAI.Tools;
+using UnAI.MCP;
 using UnAI.Utilities;
 using UnityEditor;
 using UnityEngine;
@@ -59,6 +60,12 @@ namespace UnAI.Editor.Assistant
         [SerializeField] private bool _autoSaveEnabled;
         [SerializeField] private int _responseFormatIndex; // 0=Text, 1=JsonObject, 2=JsonSchema
 
+        // MCP server state
+        [SerializeField] private bool _mcpFoldout;
+        [SerializeField] private int _mcpPort = 3389;
+        [SerializeField] private bool _mcpAutoStart;
+        private UnaiMcpServer _mcpServer;
+
         // Per-request tracking (not serialized — transient during a single request)
         private float _requestStartTime;
         private int _requestStepCount;
@@ -86,6 +93,10 @@ namespace UnAI.Editor.Assistant
             LoadConfig();
             RefreshProviderList();
             RestoreAfterDomainReload();
+
+            _mcpServer ??= new UnaiMcpServer();
+            if (_mcpAutoStart && !_mcpServer.IsRunning)
+                StartMcpServer();
         }
 
         private void OnDisable()
@@ -93,6 +104,11 @@ namespace UnAI.Editor.Assistant
             // Save conversation state before potential domain reload
             SaveConversationState();
             CancelRequest();
+        }
+
+        private void OnDestroy()
+        {
+            _mcpServer?.Stop();
         }
 
         private void LoadConfig()
@@ -1118,6 +1134,15 @@ namespace UnAI.Editor.Assistant
 
                 EditorGUILayout.EndHorizontal();
 
+                EditorGUILayout.Space(4);
+
+                // MCP Server section
+                _mcpFoldout = EditorGUILayout.Foldout(_mcpFoldout, "MCP Server", true);
+                if (_mcpFoldout)
+                {
+                    DrawMcpSection();
+                }
+
                 EditorGUI.indentLevel--;
 
                 // Reset session button
@@ -1135,6 +1160,72 @@ namespace UnAI.Editor.Assistant
             }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawMcpSection()
+        {
+            _mcpServer ??= new UnaiMcpServer();
+            bool running = _mcpServer.IsRunning;
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(14);
+
+            // Status indicator + start/stop
+            string statusLabel = running ? "Running" : "Stopped";
+            Color statusColor = running ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.6f, 0.6f, 0.6f);
+            var prevColor = GUI.contentColor;
+            GUI.contentColor = statusColor;
+            EditorGUILayout.LabelField(statusLabel, EditorStyles.boldLabel, GUILayout.Width(55));
+            GUI.contentColor = prevColor;
+
+            if (running)
+            {
+                if (GUILayout.Button("Stop", EditorStyles.miniButton, GUILayout.Width(40)))
+                    _mcpServer.Stop();
+
+                EditorGUILayout.LabelField($"Clients: {_mcpServer.ConnectedClients}", _debugStyle, GUILayout.Width(70));
+            }
+            else
+            {
+                EditorGUI.BeginDisabledGroup(false);
+                _mcpPort = EditorGUILayout.IntField(_mcpPort, GUILayout.Width(50));
+                _mcpPort = Mathf.Clamp(_mcpPort, 1024, 65535);
+                EditorGUI.EndDisabledGroup();
+
+                if (GUILayout.Button("Start", EditorStyles.miniButton, GUILayout.Width(40)))
+                    StartMcpServer();
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            _mcpAutoStart = EditorGUILayout.Toggle("Auto-start on load", _mcpAutoStart);
+
+            if (running)
+            {
+                // URL copy
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(14);
+                EditorGUILayout.TextField(_mcpServer.Url, EditorStyles.miniTextField);
+                if (GUILayout.Button("Copy", EditorStyles.miniButton, GUILayout.Width(40)))
+                {
+                    GUIUtility.systemCopyBuffer = _mcpServer.Url;
+                    Debug.Log($"[UNAI MCP] URL copied: {_mcpServer.Url}");
+                }
+                EditorGUILayout.EndHorizontal();
+
+                // Claude Desktop config hint
+                EditorGUILayout.LabelField(
+                    $"Claude Desktop config: {{ \"mcpServers\": {{ \"unity\": {{ \"url\": \"{_mcpServer.Url}\" }} }} }}",
+                    _debugStyle);
+            }
+        }
+
+        private void StartMcpServer()
+        {
+            _mcpServer ??= new UnaiMcpServer();
+            var tools = UnaiAssistantToolsFactory.CreateEditorToolRegistry();
+            _mcpServer.Start(_mcpPort, tools);
+            Repaint();
         }
 
         private static string FormatDuration(float ms)
