@@ -8,7 +8,7 @@ using UnAI.Core;
 using UnAI.Memory;
 using UnAI.Models;
 using UnAI.Tools;
-using UnAI.MCP;
+using System.Reflection;
 using UnAI.Utilities;
 using UnityEditor;
 using UnityEngine;
@@ -60,11 +60,12 @@ namespace UnAI.Editor.Assistant
         [SerializeField] private bool _autoSaveEnabled;
         [SerializeField] private int _responseFormatIndex; // 0=Text, 1=JsonObject, 2=JsonSchema
 
-        // MCP server state
+        // MCP server state (accessed via reflection to avoid hard dependency on UnAI.MCP)
         [SerializeField] private bool _mcpFoldout;
         [SerializeField] private int _mcpPort = 3389;
         [SerializeField] private bool _mcpAutoStart;
-        private UnaiMcpServer _mcpServer;
+        private object _mcpServer; // UnaiMcpServer instance (or null if MCP module not present)
+        private bool _mcpAvailable = true; // false if MCP assembly not found
 
         // Per-request tracking (not serialized — transient during a single request)
         private float _requestStartTime;
@@ -94,9 +95,8 @@ namespace UnAI.Editor.Assistant
             RefreshProviderList();
             RestoreAfterDomainReload();
 
-            _mcpServer ??= new UnaiMcpServer();
-            if (_mcpAutoStart && !_mcpServer.IsRunning)
-                StartMcpServer();
+            if (_mcpAutoStart && _mcpAvailable)
+                EnsureMcpStarted();
         }
 
         private void OnDisable()
@@ -108,7 +108,7 @@ namespace UnAI.Editor.Assistant
 
         private void OnDestroy()
         {
-            _mcpServer?.Stop();
+            McpInvoke("Stop");
         }
 
         private void LoadConfig()
@@ -1164,8 +1164,13 @@ namespace UnAI.Editor.Assistant
 
         private void DrawMcpSection()
         {
-            _mcpServer ??= new UnaiMcpServer();
-            bool running = _mcpServer.IsRunning;
+            if (!_mcpAvailable)
+            {
+                EditorGUILayout.LabelField("MCP module not installed (Scripts/MCP/ folder missing).", _debugStyle);
+                return;
+            }
+
+            bool running = McpGetBool("IsRunning");
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(14);
@@ -1181,19 +1186,18 @@ namespace UnAI.Editor.Assistant
             if (running)
             {
                 if (GUILayout.Button("Stop", EditorStyles.miniButton, GUILayout.Width(40)))
-                    _mcpServer.Stop();
+                    McpInvoke("Stop");
 
-                EditorGUILayout.LabelField($"Clients: {_mcpServer.ConnectedClients}", _debugStyle, GUILayout.Width(70));
+                int clients = McpGetInt("ConnectedClients");
+                EditorGUILayout.LabelField($"Clients: {clients}", _debugStyle, GUILayout.Width(70));
             }
             else
             {
-                EditorGUI.BeginDisabledGroup(false);
                 _mcpPort = EditorGUILayout.IntField(_mcpPort, GUILayout.Width(50));
                 _mcpPort = Mathf.Clamp(_mcpPort, 1024, 65535);
-                EditorGUI.EndDisabledGroup();
 
                 if (GUILayout.Button("Start", EditorStyles.miniButton, GUILayout.Width(40)))
-                    StartMcpServer();
+                    EnsureMcpStarted();
             }
 
             EditorGUILayout.EndHorizontal();
@@ -1202,30 +1206,96 @@ namespace UnAI.Editor.Assistant
 
             if (running)
             {
+                string url = McpGetString("Url");
+
                 // URL copy
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(14);
-                EditorGUILayout.TextField(_mcpServer.Url, EditorStyles.miniTextField);
+                EditorGUILayout.TextField(url, EditorStyles.miniTextField);
                 if (GUILayout.Button("Copy", EditorStyles.miniButton, GUILayout.Width(40)))
                 {
-                    GUIUtility.systemCopyBuffer = _mcpServer.Url;
-                    Debug.Log($"[UNAI MCP] URL copied: {_mcpServer.Url}");
+                    GUIUtility.systemCopyBuffer = url;
+                    Debug.Log($"[UNAI MCP] URL copied: {url}");
                 }
                 EditorGUILayout.EndHorizontal();
 
-                // Claude Desktop config hint
                 EditorGUILayout.LabelField(
-                    $"Claude Desktop config: {{ \"mcpServers\": {{ \"unity\": {{ \"url\": \"{_mcpServer.Url}\" }} }} }}",
+                    $"Claude Desktop config: {{ \"mcpServers\": {{ \"unity\": {{ \"url\": \"{url}\" }} }} }}",
                     _debugStyle);
             }
         }
 
-        private void StartMcpServer()
+        // ── MCP reflection helpers (no hard dependency on UnAI.MCP assembly) ──
+
+        private static Type _mcpServerType;
+
+        private void EnsureMcpStarted()
         {
-            _mcpServer ??= new UnaiMcpServer();
-            var tools = UnaiAssistantToolsFactory.CreateEditorToolRegistry();
-            _mcpServer.Start(_mcpPort, tools);
-            Repaint();
+            try
+            {
+                if (_mcpServer == null)
+                {
+                    _mcpServerType ??= FindMcpType("UnAI.MCP.UnaiMcpServer");
+                    if (_mcpServerType == null)
+                    {
+                        _mcpAvailable = false;
+                        return;
+                    }
+                    _mcpServer = Activator.CreateInstance(_mcpServerType);
+                }
+
+                var tools = UnaiAssistantToolsFactory.CreateEditorToolRegistry();
+                var startMethod = _mcpServerType.GetMethod("Start");
+                startMethod?.Invoke(_mcpServer, new object[] { _mcpPort, tools });
+                Repaint();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[UNAI] MCP server start failed: {ex.Message}");
+                _mcpAvailable = false;
+            }
+        }
+
+        private void McpInvoke(string methodName)
+        {
+            if (_mcpServer == null) return;
+            try
+            {
+                _mcpServerType?.GetMethod(methodName)?.Invoke(_mcpServer, null);
+            }
+            catch { }
+        }
+
+        private bool McpGetBool(string propName)
+        {
+            if (_mcpServer == null) return false;
+            try { return (bool)(_mcpServerType?.GetProperty(propName)?.GetValue(_mcpServer) ?? false); }
+            catch { return false; }
+        }
+
+        private int McpGetInt(string propName)
+        {
+            if (_mcpServer == null) return 0;
+            try { return (int)(_mcpServerType?.GetProperty(propName)?.GetValue(_mcpServer) ?? 0); }
+            catch { return 0; }
+        }
+
+        private string McpGetString(string propName)
+        {
+            if (_mcpServer == null) return "";
+            try { return _mcpServerType?.GetProperty(propName)?.GetValue(_mcpServer)?.ToString() ?? ""; }
+            catch { return ""; }
+        }
+
+        private static Type FindMcpType(string fullName)
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (asm.IsDynamic) continue;
+                var type = asm.GetType(fullName);
+                if (type != null) return type;
+            }
+            return null;
         }
 
         private static string FormatDuration(float ms)
