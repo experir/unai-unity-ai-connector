@@ -16,8 +16,7 @@ namespace UnAI.Editor
             window.minSize = new Vector2(400, 300);
         }
 
-        [MenuItem("Window/UnAI/Create Global Config")]
-        public static void CreateConfig()
+        internal static void CreateConfig()
         {
             var config = CreateInstance<UnaiGlobalConfig>();
             string path = "Assets/UnAI/UnaiGlobalConfig.asset";
