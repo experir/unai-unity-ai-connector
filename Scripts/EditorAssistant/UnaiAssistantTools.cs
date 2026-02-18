@@ -2966,6 +2966,158 @@ namespace UnAI.Editor.Assistant
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  C# CODE EXECUTION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class ExecuteCSharpTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "execute_csharp",
+            Description = "Compile and execute arbitrary C# code in the Unity Editor. " +
+                          "The code runs in a static method with full access to UnityEngine and UnityEditor APIs. " +
+                          "Use Debug.Log() or return a string from the 'output' StringBuilder to send results back.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""code"": { ""type"": ""string"", ""description"": ""C# code to execute. It will be placed inside a static method body. Use 'output' (StringBuilder) to return data, and 'go' helpers like GameObject.Find() etc. Full UnityEngine and UnityEditor namespaces are available."" },
+                    ""usings"": { ""type"": ""array"", ""items"": { ""type"": ""string"" }, ""description"": ""Additional using namespaces (UnityEngine, UnityEditor, System, System.Linq are included by default)"" }
+                },
+                ""required"": [""code""]
+            }")
+        };
+
+        // Cached references to assemblies for compilation
+        private static string[] _assemblyPaths;
+
+        protected override string Execute(JObject args)
+        {
+            string code = GetString(args, "code");
+            if (string.IsNullOrWhiteSpace(code))
+                return "Error: 'code' is required.";
+
+            var extraUsings = args["usings"] as JArray;
+
+            // Build the full source
+            var source = new StringBuilder();
+            source.AppendLine("using System;");
+            source.AppendLine("using System.Collections.Generic;");
+            source.AppendLine("using System.Linq;");
+            source.AppendLine("using System.Text;");
+            source.AppendLine("using UnityEngine;");
+            source.AppendLine("using UnityEditor;");
+
+            if (extraUsings != null)
+            {
+                foreach (var u in extraUsings)
+                    source.AppendLine($"using {u};");
+            }
+
+            source.AppendLine();
+            source.AppendLine("public static class UnaiCodeRunner");
+            source.AppendLine("{");
+            source.AppendLine("    public static string Run()");
+            source.AppendLine("    {");
+            source.AppendLine("        var output = new StringBuilder();");
+            source.AppendLine("        try");
+            source.AppendLine("        {");
+            // Indent user code
+            foreach (var line in code.Split('\n'))
+                source.AppendLine("            " + line.TrimEnd('\r'));
+            source.AppendLine("        }");
+            source.AppendLine("        catch (Exception ex)");
+            source.AppendLine("        {");
+            source.AppendLine("            output.AppendLine($\"Runtime error: {ex.GetType().Name}: {ex.Message}\");");
+            source.AppendLine("            output.AppendLine(ex.StackTrace);");
+            source.AppendLine("        }");
+            source.AppendLine("        return output.ToString();");
+            source.AppendLine("    }");
+            source.AppendLine("}");
+
+            string fullSource = source.ToString();
+
+            try
+            {
+                // Use CodeDomProvider for compilation
+                var provider = new Microsoft.CSharp.CSharpCodeProvider();
+                var parameters = new System.CodeDom.Compiler.CompilerParameters
+                {
+                    GenerateInMemory = true,
+                    GenerateExecutable = false,
+                    TreatWarningsAsErrors = false,
+                    IncludeDebugInformation = false
+                };
+
+                // Add assembly references
+                if (_assemblyPaths == null)
+                    _assemblyPaths = CollectAssemblyPaths();
+
+                foreach (var asmPath in _assemblyPaths)
+                    parameters.ReferencedAssemblies.Add(asmPath);
+
+                var result = provider.CompileAssemblyFromSource(parameters, fullSource);
+
+                if (result.Errors.HasErrors)
+                {
+                    var errorSb = new StringBuilder();
+                    errorSb.AppendLine("Compilation errors:");
+                    foreach (System.CodeDom.Compiler.CompilerError error in result.Errors)
+                    {
+                        if (!error.IsWarning)
+                            errorSb.AppendLine($"  Line {error.Line - CountHeaderLines()}: {error.ErrorText}");
+                    }
+                    return errorSb.ToString();
+                }
+
+                // Execute
+                var assembly = result.CompiledAssembly;
+                var type = assembly.GetType("UnaiCodeRunner");
+                var method = type?.GetMethod("Run", BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                    return "Error: Could not find Run method in compiled assembly.";
+
+                var output = (string)method.Invoke(null, null);
+                return string.IsNullOrEmpty(output)
+                    ? "(Code executed successfully — no output. Use output.AppendLine() to return data.)"
+                    : output;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.GetType().Name}: {ex.Message}";
+            }
+        }
+
+        private int CountHeaderLines()
+        {
+            // Number of lines before user code starts (usings + class + method + try + {)
+            return 12;
+        }
+
+        private static string[] CollectAssemblyPaths()
+        {
+            var paths = new HashSet<string>();
+
+            // Add all currently loaded assemblies that have a valid location
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    if (asm.IsDynamic) continue;
+                    string loc = asm.Location;
+                    if (!string.IsNullOrEmpty(loc) && System.IO.File.Exists(loc))
+                        paths.Add(loc);
+                }
+                catch
+                {
+                    // Skip assemblies that throw on Location access
+                }
+            }
+
+            return paths.ToArray();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  BATCH EXECUTION
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -3151,8 +3303,9 @@ namespace UnAI.Editor.Assistant
             registry.Register(new RunTestsTool());
             registry.Register(new ScreenshotCaptureTool());
 
-            // Reflection
+            // Reflection & execution
             registry.Register(new ComponentReflectionTool());
+            registry.Register(new ExecuteCSharpTool());
 
             // Batch
             registry.Register(new BatchExecuteTool(registry));

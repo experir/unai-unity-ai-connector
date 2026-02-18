@@ -309,7 +309,7 @@ namespace UnAI.Editor.Assistant
                 string tools = "inspect_scene, create_gameobject, create_physics_setup,\n" +
                                "manage_assets, manage_packages, play_mode,\n" +
                                "component_properties, batch_execute, capture_screenshot,\n" +
-                               "search_project, read_script, and more (31 tools)";
+                               "search_project, execute_csharp, and more (32 tools)";
                 EditorGUILayout.LabelField("Available tools:", EditorStyles.centeredGreyMiniLabel);
                 EditorGUILayout.LabelField(tools,
                     new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true, fontSize = 10 });
@@ -854,6 +854,7 @@ namespace UnAI.Editor.Assistant
                 "- 'run_tests': Open Unity Test Runner for EditMode or PlayMode tests\n" +
                 "- 'capture_screenshot': Capture a screenshot of the Game View or Scene View as PNG\n" +
                 "- 'component_properties': Read or write any serialized property on any component via reflection\n" +
+                "- 'execute_csharp': Compile and run arbitrary C# code with full Unity API access. Use 'output' StringBuilder to return data\n" +
                 "- 'batch_execute': Execute multiple tool calls in a single atomic batch (one Undo step)\n" +
                 "- 'get_selection': Get currently selected objects\n" +
                 "- 'execute_menu_item': Run any Unity menu command (e.g. 'GameObject/Light/Directional Light')\n" +
