@@ -347,60 +347,122 @@ No adapters, no wrappers, no duplicate code.
 
 ## Modular Structure
 
-UNAI is split into **4 independent modules**. Use what you need, delete what you don't:
-
-| Module | Folder | Assembly | Platform | Purpose |
-|--------|--------|----------|----------|---------|
-| **Core** | `Scripts/Runtime/` | `UnAI.Runtime` | All | Chat API, providers, streaming — always required |
-| **Agent** | `Scripts/Agent/` | `UnAI.Agent` | All | Tool calling, memory, agent loop — for AI agents |
-| **Editor Assistant** | `Scripts/EditorAssistant/` | `UnAI.EditorAssistant` | Editor | AI chat window with 24 Unity tools |
-| **MCP Server** | `Scripts/MCP/` | `UnAI.MCP` | Editor | Expose tools to Claude Desktop, Cursor, etc. |
+UNAI is split into **4 independent modules** with clean dependency boundaries. Each module has its own assembly definition — **delete any optional folder and the project compiles with zero errors**.
 
 ```
-Scripts/
-  Runtime/            <- Core chat API (always keep)
-  Agent/              <- Agent system (optional — delete for chat-only)
-  EditorAssistant/    <- Editor AI assistant (optional — editor only)
-  MCP/                <- MCP server (optional — editor only)
-  Editor/             <- Core editor scripts (config inspector, setup wizard)
+┌─────────────────────────────────────────────────────────────────┐
+│                        YOUR UNITY PROJECT                       │
+│                                                                 │
+│  ┌─────────────────────┐   ┌──────────────────────────────────┐ │
+│  │  Editor Assistant   │   │          MCP Server              │ │
+│  │  (Scripts/          │   │  (Scripts/MCP/)                  │ │
+│  │   EditorAssistant/) │   │                                  │ │
+│  │                     │   │  Exposes tools to Claude Desktop,│ │
+│  │  AI chat window     │   │  Cursor, or any MCP client       │ │
+│  │  32 built-in tools  │   │  Pure C# HttpListener            │ │
+│  │  Debug panel + MCP  │   │  JSON-RPC 2.0 + SSE              │ │
+│  │  controls           │   │  Own standalone window            │ │
+│  │                     │   │                                  │ │
+│  │  EDITOR ONLY        │   │  EDITOR ONLY                     │ │
+│  └────────┬────────────┘   └──────────┬───────────────────────┘ │
+│           │ depends on                │ depends on              │
+│           │ (hard ref)                │ (hard ref)              │
+│           ▼                           ▼                         │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                     Agent System                           │ │
+│  │                  (Scripts/Agent/)                           │ │
+│  │                                                            │ │
+│  │  UnaiAgent           Observe-think-act reasoning loop      │ │
+│  │  UnaiToolRegistry    Register and execute IUnaiTool        │ │
+│  │  UnaiConversation    Token-aware memory management         │ │
+│  │  UnaiToolSerializer  Text-based tool call parsing          │ │
+│  │                                                            │ │
+│  │  RUNTIME + EDITOR          ◄── works in shipped games      │ │
+│  └────────────────────────────────┬───────────────────────────┘ │
+│                                   │ depends on                  │
+│                                   │ (hard ref)                  │
+│                                   ▼                             │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                        Core                                │ │
+│  │                   (Scripts/Runtime/)                        │ │
+│  │                                                            │ │
+│  │  UnaiManager           Singleton entry point               │ │
+│  │  UnaiProviderRegistry  Provider lookup (lazy init)         │ │
+│  │  IUnaiProvider         Unified interface for all LLMs      │ │
+│  │    ├─ OpenAICompatibleBase  (OpenAI, Mistral, LM Studio,  │ │
+│  │    │                         llama.cpp, xAI, DeepSeek)     │ │
+│  │    ├─ AnthropicProvider     (Claude)                       │ │
+│  │    ├─ GeminiProvider        (Google Gemini)                │ │
+│  │    ├─ CohereProvider        (Command R/A)                  │ │
+│  │    └─ OllamaProvider        (Local models)                 │ │
+│  │                                                            │ │
+│  │  RUNTIME + EDITOR          ◄── always required             │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Editor Scripts (Scripts/Editor/)                           │ │
+│  │  Config inspector, setup wizard — always keep with Core    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+
+Key: ──── hard assembly reference (asmdef)
+     Editor Assistant ◄──► MCP Server: NO direct reference
+     (they discover each other via reflection at runtime)
 ```
 
-**Just want chat completions in your game?** Delete `Agent/`, `EditorAssistant/`, and `MCP/`.
+### Module details
 
-**Want runtime agents but no editor tools?** Keep `Runtime/` and `Agent/`.
+| Module | Folder | Assembly | Platform | Can delete? |
+|--------|--------|----------|----------|-------------|
+| **Core** | `Scripts/Runtime/` | `UnAI.Runtime` | All | No — always required |
+| **Agent** | `Scripts/Agent/` | `UnAI.Agent` | All | Yes — if you only need chat |
+| **Editor Assistant** | `Scripts/EditorAssistant/` | `UnAI.EditorAssistant` | Editor | Yes — MCP and Core still work |
+| **MCP Server** | `Scripts/MCP/` | `UnAI.MCP` | Editor | Yes — Assistant and Core still work |
 
-**Want MCP without the editor assistant?** Keep `Runtime/`, `Agent/`, and `MCP/`.
+### Pick what you need
 
-**Want everything?** Keep all folders as-is.
+| You want... | Keep these folders | Delete these |
+|---|---|---|
+| Just chat API in your game | `Runtime/`, `Editor/` | `Agent/`, `EditorAssistant/`, `MCP/` |
+| Runtime agents with tools | `Runtime/`, `Agent/`, `Editor/` | `EditorAssistant/`, `MCP/` |
+| Editor assistant only | `Runtime/`, `Agent/`, `EditorAssistant/`, `Editor/` | `MCP/` |
+| MCP server only | `Runtime/`, `Agent/`, `MCP/`, `Editor/` | `EditorAssistant/` |
+| Everything | Keep all | Nothing |
 
-Each module has its own assembly definition, so removing a folder cleanly removes that feature with no compile errors.
+### How modules discover each other
 
-## Architecture
+Editor Assistant and MCP Server are **sibling modules** — neither depends on the other. When both are installed:
+
+- The **Assistant window** detects MCP via reflection and shows a "MCP Server" foldout in its Debug panel (start/stop, port, status)
+- The **MCP window** detects EditorAssistant via reflection and loads the 32 tools from it
+- If either module is missing, the other **still works** — no compile errors, no runtime errors, just graceful degradation
+
+This means you get **one unified window** when both are present, but each module remains fully independent.
+
+### IUnaiTool — write once, use everywhere
+
+Any tool implementing `IUnaiTool` automatically works in all three contexts:
 
 ```
-Scripts/MCP/                           (UnAI.MCP - editor only)
-  UnaiMcpServer                        HttpListener-based MCP server
-  UnaiMcpProtocol                      JSON-RPC 2.0 handler
-  UnaiMcpTransport                     SSE streaming transport
-    |
-Scripts/EditorAssistant/               (UnAI.EditorAssistant - editor only)
-  UnaiAssistantWindow                  AI chat window in Unity Editor
-  UnaiAssistantTools                   24 built-in editor tools
-    |
-Scripts/Agent/                         (UnAI.Agent - runtime)
-  UnaiAgent                            Observe-think-act loop
-  Memory/UnaiConversation              Token-aware conversation history
-  Tools/UnaiToolRegistry               Tool registration + execution
-    |
-Scripts/Runtime/                       (UnAI.Runtime - core, always required)
-  UnaiManager                          MonoBehaviour singleton entry point
-  UnaiProviderRegistry                 Static provider lookup (lazy init)
-  IUnaiProvider -> UnaiProviderBase    Template method pattern
-    -> OpenAICompatibleBase            Shared by 5 providers
-    -> AnthropicProvider, GeminiProvider, CohereProvider, OllamaProvider
+                    ┌─────────────────┐
+                    │   Your IUnaiTool │
+                    │   implementation │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+     ┌────────────┐  ┌────────────┐  ┌────────────┐
+     │  In-game   │  │  Editor    │  │  MCP       │
+     │  Agent     │  │  Assistant │  │  (external  │
+     │  (runtime) │  │  (editor)  │  │   clients)  │
+     └────────────┘  └────────────┘  └────────────┘
 ```
 
-All HTTP goes through `UnityWebRequest` (works on every platform including WebGL). Streaming uses a custom `DownloadHandlerScript` that parses SSE/NDJSON in real-time on the main thread. Tool calling uses native provider APIs where available (OpenAI, Anthropic, Gemini) with text-based fallback for others.
+No adapters, no wrappers — the same C# class works at runtime in your game, in the editor chat window, and exposed to Claude Desktop via MCP.
+
+## Technical Details
+
+All HTTP goes through `UnityWebRequest` (works on every platform including WebGL). Streaming uses a custom `DownloadHandlerScript` that parses SSE/NDJSON in real-time on the main thread. Tool calling uses native provider APIs where available (OpenAI, Anthropic, Gemini) with text-based fallback for others. The MCP server uses `System.Net.HttpListener` (built into .NET) with SSE for server-initiated messages — no Node.js, no external processes.
 
 ## Configuration
 
