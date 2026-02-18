@@ -5,7 +5,28 @@
 
 Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and more — with a single, unified C# API. Use cloud models or run local LLMs. Swap providers with one line of code.
 
-**AI for Unity games, tools, and apps** — chat completions, real-time streaming, async/await, cross-platform (Windows, Mac, Linux, Android, iOS, WebGL).
+**One package, four ways to use AI in Unity:**
+
+| Mode | What it does | Example |
+|------|-------------|---------|
+| **Runtime Chat** | Call any LLM from your game at runtime | NPC dialogue, AI mechanics, chatbots |
+| **AI Agent** | Multi-step reasoning with tool calling and memory | Autonomous NPCs, game assistants |
+| **Editor Assistant** | AI chat window inside the Unity Editor (24 tools) | Scene inspection, GameObject creation, script editing |
+| **MCP Server** | Expose Unity tools to external AI clients via MCP protocol | Control Unity from Claude Desktop, Cursor, or any MCP client |
+
+All pure C#. No Node.js, no Python, no external processes, no separate frameworks.
+
+## Why One Package Instead of Many?
+
+Most Unity AI solutions force you to choose: a chat SDK for one provider, a separate agent framework, a separate MCP server, a separate editor tool — each with its own dependencies, update cycles, and integration issues.
+
+**UNAI is different.** One package gives you everything:
+
+- **Runtime + Editor + Agent + MCP** — all built on the same `IUnaiProvider` interface and `IUnaiTool` system
+- **Tools you write once work everywhere** — the same `IUnaiTool` implementation works in your game, in the editor assistant, AND is automatically exposed via MCP to external clients like Claude Desktop
+- **No dependency conflicts** — one package means one Newtonsoft JSON reference, one version to track, one update to apply
+- **Modular by design** — don't need agents? Delete the folder. Don't need MCP? Delete the folder. Each module has its own assembly definition — no compile errors, no orphaned references
+- **Zero external dependencies** — the MCP server is a pure C# `HttpListener`, not a Node.js sidecar. The agent loop is C#, not a Python framework. Everything runs inside Unity's process with direct access to the Unity API
 
 ## Supported Providers
 
@@ -28,27 +49,33 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 - **Unified API** — one interface for all providers, switch with a single line
 - **AI Agent system** — multi-step reasoning with tool calling, conversation memory, and observe-think-act loop
 - **Tool/Function calling** — native support for OpenAI, Anthropic, and Gemini; text-based fallback for all others
-- **Editor AI Assistant** — built-in editor window that can inspect scenes, create GameObjects, read scripts, and more
+- **MCP Server** — built-in Model Context Protocol server lets Claude Desktop, Cursor, and other MCP clients control Unity
+- **Editor AI Assistant** — built-in editor window with 24 tools for scene inspection, GameObject creation, physics setup, and more
+- **Structured output / JSON mode** — force JSON responses with optional schema validation across all providers
 - **Conversation memory** — token-aware history management with automatic truncation
 - **Real-time streaming** — token-by-token responses on the main thread, perfect for chat UIs
 - **Async/await** — native C# `Task`-based API, no coroutine boilerplate
 - **Cross-platform** — Windows, Mac, Linux, Android, iOS, and WebGL via `UnityWebRequest`
 - **Local AI support** — run models offline with Ollama, LM Studio, or llama.cpp
 - **OpenAI-compatible** — works with any provider that follows the OpenAI API format (xAI Grok, DeepSeek, Perplexity, vLLM, etc.)
-- **Zero dependencies** — only requires Newtonsoft JSON (auto-installed)
+- **Provider fallback chain** — automatic failover to backup providers when a request fails
+- **Response caching** — LRU cache with TTL for non-streaming requests
+- **Lazy provider init** — providers are instantiated on first use, not at startup
+- **Zero external dependencies** — only requires Newtonsoft JSON (auto-installed)
 - **Runtime provider switching** — change AI backends on the fly without restarting
 - **ScriptableObject config** — inspector-friendly setup with env var overrides for production
-- **Modular** — 3 independent modules (core, agent, editor assistant) — use only what you need, delete the rest
+- **Modular** — 4 independent modules (core, agent, editor assistant, MCP) — use only what you need, delete the rest
 
 ## Use Cases
 
-- **AI agents** for games — NPCs with tool use, memory, and multi-step reasoning
-- **Editor AI assistant** — inspect scenes, create objects, read scripts from a chat window
-- NPC dialogue and AI-driven characters in games
-- In-editor AI coding and content generation tools
-- AI-powered game mechanics (procedural quests, adaptive difficulty)
-- Chatbot and virtual assistant apps built in Unity
-- Rapid prototyping with local models, deploying with cloud APIs
+- **AI agents for games** — NPCs with tool use, memory, and multi-step reasoning
+- **MCP bridge to Unity** — let Claude Desktop, Cursor, or any MCP client inspect and modify your Unity project
+- **Editor AI assistant** — inspect scenes, create objects, set up physics, read scripts from a chat window
+- **NPC dialogue** and AI-driven characters in games
+- **In-editor AI tools** — coding assistants, content generation, automated scene setup
+- **AI-powered game mechanics** — procedural quests, adaptive difficulty, dynamic storytelling
+- **Chatbot and virtual assistant** apps built in Unity
+- **Rapid prototyping** with local models (Ollama), deploying with cloud APIs (OpenAI, Claude)
 
 ## Installation
 
@@ -255,42 +282,87 @@ conversation.AddAssistant(response.Content);
 
 Open **Window > UnAI > AI Assistant** to get a chat-powered assistant directly in the Unity Editor.
 
-### Built-in tools
+### Built-in tools (24)
 
-| Tool | Description |
-|------|-------------|
-| `inspect_scene` | List all GameObjects in the active scene hierarchy |
-| `find_gameobject` | Find GameObjects by name, tag, or component |
-| `create_gameobject` | Create a GameObject with position and components (Undo supported) |
-| `inspect_gameobject` | Get transform, components, and properties of a GameObject |
-| `read_script` | Read contents of a C# script file |
-| `list_assets` | List assets in a project folder |
-| `get_selection` | Get currently selected objects in the editor |
-| `log_message` | Write a message to the Unity Console |
+| Category | Tools |
+|----------|-------|
+| **Scene** | `inspect_scene`, `find_gameobject`, `get_selection`, `focus_scene_view` |
+| **GameObjects** | `create_gameobject`, `modify_gameobject`, `inspect_gameobject`, `duplicate_gameobject` |
+| **Components** | `add_component_configured`, `create_physics_setup`, `set_layer_tag` |
+| **Materials & Lighting** | `create_material`, `create_light` |
+| **Prefabs** | `create_prefab` |
+| **Scripts & Assets** | `read_script`, `create_script`, `modify_script`, `list_assets`, `search_project` |
+| **Project** | `get_project_settings` |
+| **Editor** | `execute_menu_item`, `undo`, `get_console_logs`, `log_message` |
 
 The assistant uses the same agent system, so it reasons through multi-step tasks and calls tools automatically.
 
+## MCP Server
+
+UNAI includes a built-in **Model Context Protocol (MCP)** server that exposes all 24 editor tools to external AI clients. Pure C# — no Node.js, no npm, no external processes.
+
+### Start the server
+
+Open **Window > UnAI > MCP Server** and click **Start Server**.
+
+### Connect from Claude Desktop
+
+Add this to your Claude Desktop config (Settings > Developer > Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "unity": {
+      "url": "http://localhost:3389/mcp"
+    }
+  }
+}
+```
+
+Now Claude Desktop can inspect your scenes, create GameObjects, set up physics, read scripts, and more — all through natural language.
+
+### How it works
+
+- Implements the **MCP Streamable HTTP** transport (JSON-RPC 2.0 over HTTP + SSE)
+- Runs inside Unity's process via `HttpListener` — full access to Unity API
+- Tool calls execute on the Unity main thread (safe for all Unity operations)
+- All `IUnaiTool` implementations are automatically exposed as MCP tools
+- Works with any MCP-compatible client: Claude Desktop, Cursor, custom clients
+
+### Write once, use everywhere
+
+The same `IUnaiTool` you write for your game agent is automatically available:
+1. **In your game** — via the agent's `UnaiToolRegistry`
+2. **In the editor** — via the Editor AI Assistant window
+3. **Via MCP** — to any external AI client like Claude Desktop
+
+No adapters, no wrappers, no duplicate code.
+
 ## Modular Structure
 
-UNAI is split into **3 independent modules**. Use what you need, delete what you don't:
+UNAI is split into **4 independent modules**. Use what you need, delete what you don't:
 
-| Module | Folder | Assembly | Purpose |
-|--------|--------|----------|---------|
-| **Core** | `Scripts/Runtime/` | `UnAI.Runtime` | Chat API, providers, streaming — always required |
-| **Agent System** | `Scripts/Agent/` | `UnAI.Agent` | Tool calling, memory, agent loop — for in-game AI agents |
-| **Editor Assistant** | `Scripts/EditorAssistant/` | `UnAI.EditorAssistant` | Editor AI window — for developer tooling |
+| Module | Folder | Assembly | Platform | Purpose |
+|--------|--------|----------|----------|---------|
+| **Core** | `Scripts/Runtime/` | `UnAI.Runtime` | All | Chat API, providers, streaming — always required |
+| **Agent** | `Scripts/Agent/` | `UnAI.Agent` | All | Tool calling, memory, agent loop — for AI agents |
+| **Editor Assistant** | `Scripts/EditorAssistant/` | `UnAI.EditorAssistant` | Editor | AI chat window with 24 Unity tools |
+| **MCP Server** | `Scripts/MCP/` | `UnAI.MCP` | Editor | Expose tools to Claude Desktop, Cursor, etc. |
 
 ```
 Scripts/
   Runtime/            <- Core chat API (always keep)
-  Agent/              <- Agent system (delete to remove agent features)
-  EditorAssistant/    <- Editor AI assistant (delete to remove editor tools)
+  Agent/              <- Agent system (optional — delete for chat-only)
+  EditorAssistant/    <- Editor AI assistant (optional — editor only)
+  MCP/                <- MCP server (optional — editor only)
   Editor/             <- Core editor scripts (config inspector, setup wizard)
 ```
 
-**Just want chat?** Delete `Scripts/Agent/` and `Scripts/EditorAssistant/` — the core chat API works standalone.
+**Just want chat completions in your game?** Delete `Agent/`, `EditorAssistant/`, and `MCP/`.
 
-**Want agents but no editor assistant?** Delete only `Scripts/EditorAssistant/`.
+**Want runtime agents but no editor tools?** Keep `Runtime/` and `Agent/`.
+
+**Want MCP without the editor assistant?** Keep `Runtime/`, `Agent/`, and `MCP/`.
 
 **Want everything?** Keep all folders as-is.
 
@@ -299,20 +371,25 @@ Each module has its own assembly definition, so removing a folder cleanly remove
 ## Architecture
 
 ```
-Scripts/EditorAssistant/            (UnAI.EditorAssistant - editor only)
-  UnaiAssistantWindow               AI chat window in Unity Editor
-  UnaiAssistantTools                Built-in editor tools
+Scripts/MCP/                           (UnAI.MCP - editor only)
+  UnaiMcpServer                        HttpListener-based MCP server
+  UnaiMcpProtocol                      JSON-RPC 2.0 handler
+  UnaiMcpTransport                     SSE streaming transport
     |
-Scripts/Agent/                      (UnAI.Agent - runtime)
-  UnaiAgent                         Observe-think-act loop
-  Memory/UnaiConversation           Token-aware conversation history
-  Tools/UnaiToolRegistry            Tool registration + execution
+Scripts/EditorAssistant/               (UnAI.EditorAssistant - editor only)
+  UnaiAssistantWindow                  AI chat window in Unity Editor
+  UnaiAssistantTools                   24 built-in editor tools
     |
-Scripts/Runtime/                    (UnAI.Runtime - core, always required)
-  UnaiManager                       MonoBehaviour singleton entry point
-  UnaiProviderRegistry              Static provider lookup
-  IUnaiProvider -> UnaiProviderBase Template method pattern
-    -> OpenAICompatibleBase         Shared by 5 providers
+Scripts/Agent/                         (UnAI.Agent - runtime)
+  UnaiAgent                            Observe-think-act loop
+  Memory/UnaiConversation              Token-aware conversation history
+  Tools/UnaiToolRegistry               Tool registration + execution
+    |
+Scripts/Runtime/                       (UnAI.Runtime - core, always required)
+  UnaiManager                          MonoBehaviour singleton entry point
+  UnaiProviderRegistry                 Static provider lookup (lazy init)
+  IUnaiProvider -> UnaiProviderBase    Template method pattern
+    -> OpenAICompatibleBase            Shared by 5 providers
     -> AnthropicProvider, GeminiProvider, CohereProvider, OllamaProvider
 ```
 
@@ -330,11 +407,11 @@ API key resolution order:
 
 ## Platform Support
 
-| Platform | Chat | Streaming | Notes |
-|----------|------|-----------|-------|
-| Windows/Mac/Linux | Yes | Yes | Full support |
-| Android/iOS | Yes | Yes | Full support |
-| WebGL | Yes | Varies | Streaming depends on browser; CORS required |
+| Platform | Chat | Streaming | Agent | MCP Server | Notes |
+|----------|------|-----------|-------|------------|-------|
+| Windows/Mac/Linux | Yes | Yes | Yes | Yes (Editor) | Full support |
+| Android/iOS | Yes | Yes | Yes | N/A | Full runtime support |
+| WebGL | Yes | Varies | Yes | N/A | Streaming depends on browser; CORS required |
 
 ## Requirements
 
