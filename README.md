@@ -20,21 +20,27 @@ All pure C#. No Node.js, no Python, no external processes, no separate framework
 
 ```mermaid
 graph TB
-    subgraph editor ["Editor only — for dev workflow"]
-        EA["🖥️ Editor Assistant<br/>32 Unity tools · AI chat window"]
-        MCP["🔌 MCP Server<br/>Claude Desktop · Cursor · any MCP client"]
+    YOU(["🧑‍💻 You"])
+
+    subgraph editor ["Editor"]
+        EA["🖥️ Editor Assistant<br/>32 Unity tools · AI chat"]
+        MCP["🔌 MCP Server<br/>Exposes tools via HTTP"]
     end
 
-    subgraph runtime ["Runtime — for in-game AI"]
-        Agent["🤖 Agent System<br/>Tool calling · Memory · Reasoning"]
+    subgraph runtime ["Runtime"]
+        Agent["🤖 Agent<br/>Tool calling · Memory · Reasoning"]
         Core["⚡ Core<br/>9 providers · Streaming · Unified API"]
     end
 
+    YOU -->|"can use as dev tools"| editor
+    YOU -->|"can ship in your app/game"| runtime
+
     EA -->|depends on| Agent
     MCP -->|depends on| Agent
-    EA -. "reflection · no hard dependency" .-> MCP
+    EA -. "shares 32 tools via reflection" .-> MCP
     Agent -->|depends on| Core
 
+    style YOU fill:#1a1a1a,stroke:#fff,color:#fff
     style EA fill:#00BD00,stroke:#009a00,color:#fff
     style MCP fill:#00BD00,stroke:#009a00,color:#fff
     style Agent fill:#00BD00,stroke:#009a00,color:#fff
@@ -43,7 +49,7 @@ graph TB
     style runtime fill:transparent,stroke:#00BD00,stroke-width:2px
 ```
 
-> **Fully modular** — every green box is optional and can be deleted with zero compile errors. Use the runtime modules to ship in-game AI, or use only the editor modules as dev tools — your choice. Editor Assistant and MCP discover each other via reflection, so neither requires the other.
+> **Fully modular** — use both paths, or pick just one. Every green box is optional and can be deleted with zero compile errors. Editor Assistant and MCP discover each other via reflection, so neither requires the other.
 
 ## Why One Package Instead of Many?
 
