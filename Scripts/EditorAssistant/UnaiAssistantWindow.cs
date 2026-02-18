@@ -306,10 +306,10 @@ namespace UnAI.Editor.Assistant
                     new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true });
                 EditorGUILayout.Space(8);
 
-                string tools = "inspect_scene, find_gameobject, create_gameobject,\n" +
-                               "inspect_gameobject, create_light, create_physics_setup,\n" +
-                               "duplicate_gameobject, search_project, read_script,\n" +
-                               "list_assets, get_project_settings, and more (24 tools)";
+                string tools = "inspect_scene, create_gameobject, create_physics_setup,\n" +
+                               "manage_assets, manage_packages, play_mode,\n" +
+                               "component_properties, batch_execute, capture_screenshot,\n" +
+                               "search_project, read_script, and more (31 tools)";
                 EditorGUILayout.LabelField("Available tools:", EditorStyles.centeredGreyMiniLabel);
                 EditorGUILayout.LabelField(tools,
                     new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true, fontSize = 10 });
@@ -848,12 +848,20 @@ namespace UnAI.Editor.Assistant
                 "- 'get_project_settings': Read Unity project settings (physics, quality, time, player)\n" +
                 "- 'focus_scene_view': Focus the Scene View camera on a specific GameObject\n" +
                 "- 'create_physics_setup': Add Rigidbody + Collider + PhysicMaterial in one call\n" +
+                "- 'play_mode': Control Play Mode — play, pause, stop, step one frame, or check status\n" +
+                "- 'manage_assets': Asset database operations — create folders, move, copy, delete, rename, refresh, find by type\n" +
+                "- 'manage_packages': Package Manager — list installed packages, add or remove packages\n" +
+                "- 'run_tests': Open Unity Test Runner for EditMode or PlayMode tests\n" +
+                "- 'capture_screenshot': Capture a screenshot of the Game View or Scene View as PNG\n" +
+                "- 'component_properties': Read or write any serialized property on any component via reflection\n" +
+                "- 'batch_execute': Execute multiple tool calls in a single atomic batch (one Undo step)\n" +
                 "- 'get_selection': Get currently selected objects\n" +
                 "- 'execute_menu_item': Run any Unity menu command (e.g. 'GameObject/Light/Directional Light')\n" +
                 "- 'undo': Undo previous action(s)\n" +
                 "- 'get_console_logs': Read Unity Console messages (errors, warnings, logs)\n" +
                 "- 'log_message': Write to Unity Console\n\n" +
                 "WORKFLOW: Think about what tools you need, then call them one by one. " +
+                "Use 'batch_execute' when you need to perform multiple quick operations in sequence. " +
                 "After all tool calls are done, give a brief summary of what was accomplished.";
         }
 

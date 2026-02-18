@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnAI.Tools;
 using UnityEditor;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -2388,6 +2392,707 @@ namespace UnAI.Editor.Assistant
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  PLAY MODE CONTROL
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class PlayModeControlTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "play_mode",
+            Description = "Control Unity Play Mode: play, pause, stop, or step one frame.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""action"": { ""type"": ""string"", ""description"": ""Action: 'play', 'pause', 'stop', 'step', 'status'"" }
+                },
+                ""required"": [""action""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string action = GetString(args, "action")?.ToLowerInvariant();
+
+            switch (action)
+            {
+                case "play":
+                    if (EditorApplication.isPlaying)
+                        return "Already in Play Mode.";
+                    EditorApplication.isPlaying = true;
+                    return "Entering Play Mode...";
+
+                case "pause":
+                    EditorApplication.isPaused = !EditorApplication.isPaused;
+                    return EditorApplication.isPaused ? "Paused." : "Unpaused.";
+
+                case "stop":
+                    if (!EditorApplication.isPlaying)
+                        return "Not in Play Mode.";
+                    EditorApplication.isPlaying = false;
+                    return "Exiting Play Mode...";
+
+                case "step":
+                    if (!EditorApplication.isPlaying)
+                    {
+                        EditorApplication.isPlaying = true;
+                        EditorApplication.isPaused = true;
+                    }
+                    EditorApplication.Step();
+                    return "Stepped one frame.";
+
+                case "status":
+                    return $"Playing: {EditorApplication.isPlaying}, Paused: {EditorApplication.isPaused}, Compiling: {EditorApplication.isCompiling}";
+
+                default:
+                    return $"Error: Unknown action '{action}'. Use 'play', 'pause', 'stop', 'step', or 'status'.";
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ASSET DATABASE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class AssetDatabaseTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "manage_assets",
+            Description = "Manage project assets: create folders, move, copy, delete, rename, or refresh the asset database.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""action"": { ""type"": ""string"", ""description"": ""Action: 'create_folder', 'move', 'copy', 'delete', 'rename', 'refresh', 'find_by_type'"" },
+                    ""path"": { ""type"": ""string"", ""description"": ""Asset path (e.g. 'Assets/Scripts/Player.cs')"" },
+                    ""destination"": { ""type"": ""string"", ""description"": ""Destination path (for move/copy/rename)"" },
+                    ""type"": { ""type"": ""string"", ""description"": ""Asset type filter for find_by_type (e.g. 'Material', 'Prefab', 'Texture2D', 'AudioClip')"" },
+                    ""folder"": { ""type"": ""string"", ""description"": ""Folder to search in for find_by_type (default: 'Assets')"" }
+                },
+                ""required"": [""action""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string action = GetString(args, "action")?.ToLowerInvariant();
+            string path = GetString(args, "path");
+            string dest = GetString(args, "destination", "dest", "to");
+
+            switch (action)
+            {
+                case "create_folder":
+                {
+                    if (string.IsNullOrEmpty(path))
+                        return "Error: 'path' is required (e.g. 'Assets/NewFolder').";
+                    string parent = System.IO.Path.GetDirectoryName(path)?.Replace('\\', '/') ?? "Assets";
+                    string folderName = System.IO.Path.GetFileName(path);
+                    string guid = AssetDatabase.CreateFolder(parent, folderName);
+                    return string.IsNullOrEmpty(guid)
+                        ? $"Error: Failed to create folder '{path}'."
+                        : $"Created folder: {path}";
+                }
+
+                case "move":
+                {
+                    if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(dest))
+                        return "Error: 'path' and 'destination' are required.";
+                    string err = AssetDatabase.MoveAsset(path, dest);
+                    return string.IsNullOrEmpty(err)
+                        ? $"Moved '{path}' to '{dest}'."
+                        : $"Error: {err}";
+                }
+
+                case "copy":
+                {
+                    if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(dest))
+                        return "Error: 'path' and 'destination' are required.";
+                    bool ok = AssetDatabase.CopyAsset(path, dest);
+                    return ok ? $"Copied '{path}' to '{dest}'." : $"Error: Failed to copy asset.";
+                }
+
+                case "delete":
+                {
+                    if (string.IsNullOrEmpty(path))
+                        return "Error: 'path' is required.";
+                    bool ok = AssetDatabase.DeleteAsset(path);
+                    return ok ? $"Deleted '{path}'." : $"Error: Failed to delete '{path}'.";
+                }
+
+                case "rename":
+                {
+                    if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(dest))
+                        return "Error: 'path' and 'destination' (new name) are required.";
+                    string err = AssetDatabase.RenameAsset(path, dest);
+                    return string.IsNullOrEmpty(err)
+                        ? $"Renamed '{path}' to '{dest}'."
+                        : $"Error: {err}";
+                }
+
+                case "refresh":
+                    AssetDatabase.Refresh();
+                    return "Asset database refreshed.";
+
+                case "find_by_type":
+                {
+                    string type = GetString(args, "type");
+                    string folder = GetString(args, "folder") ?? "Assets";
+                    if (string.IsNullOrEmpty(type))
+                        return "Error: 'type' is required (e.g. 'Material', 'Prefab', 'Texture2D').";
+
+                    string[] guids = AssetDatabase.FindAssets($"t:{type}", new[] { folder });
+                    if (guids.Length == 0)
+                        return $"No assets of type '{type}' found in '{folder}'.";
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"Found {guids.Length} asset(s) of type '{type}' in '{folder}':");
+                    int limit = Mathf.Min(guids.Length, 50);
+                    for (int i = 0; i < limit; i++)
+                    {
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guids[i]);
+                        sb.AppendLine($"  {assetPath}");
+                    }
+                    if (guids.Length > 50)
+                        sb.AppendLine($"  ... and {guids.Length - 50} more.");
+                    return sb.ToString();
+                }
+
+                default:
+                    return $"Error: Unknown action '{action}'. Use 'create_folder', 'move', 'copy', 'delete', 'rename', 'refresh', or 'find_by_type'.";
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PACKAGE MANAGER
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class PackageManagerTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "manage_packages",
+            Description = "Manage Unity packages: list installed packages, add, or remove a package.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""action"": { ""type"": ""string"", ""description"": ""Action: 'list', 'add', 'remove'"" },
+                    ""package_id"": { ""type"": ""string"", ""description"": ""Package identifier (e.g. 'com.unity.textmeshpro', 'com.unity.cinemachine', or git URL)"" }
+                },
+                ""required"": [""action""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string action = GetString(args, "action")?.ToLowerInvariant();
+            string packageId = GetString(args, "package_id", "package", "name");
+
+            switch (action)
+            {
+                case "list":
+                {
+                    var listRequest = Client.List(true);
+                    while (!listRequest.IsCompleted)
+                        System.Threading.Thread.Sleep(50);
+
+                    if (listRequest.Status == StatusCode.Failure)
+                        return $"Error: {listRequest.Error.message}";
+
+                    var sb = new StringBuilder();
+                    var packages = listRequest.Result.ToList();
+                    sb.AppendLine($"Installed packages ({packages.Count}):");
+                    foreach (var pkg in packages.OrderBy(p => p.name))
+                    {
+                        string source = pkg.source.ToString().ToLowerInvariant();
+                        sb.AppendLine($"  {pkg.name}@{pkg.version} ({source})");
+                    }
+                    return sb.ToString();
+                }
+
+                case "add":
+                {
+                    if (string.IsNullOrEmpty(packageId))
+                        return "Error: 'package_id' is required (e.g. 'com.unity.cinemachine' or a git URL).";
+                    var addRequest = Client.Add(packageId);
+                    while (!addRequest.IsCompleted)
+                        System.Threading.Thread.Sleep(50);
+
+                    return addRequest.Status == StatusCode.Failure
+                        ? $"Error: {addRequest.Error.message}"
+                        : $"Added package: {addRequest.Result.name}@{addRequest.Result.version}";
+                }
+
+                case "remove":
+                {
+                    if (string.IsNullOrEmpty(packageId))
+                        return "Error: 'package_id' is required.";
+                    var removeRequest = Client.Remove(packageId);
+                    while (!removeRequest.IsCompleted)
+                        System.Threading.Thread.Sleep(50);
+
+                    return removeRequest.Status == StatusCode.Failure
+                        ? $"Error: {removeRequest.Error.message}"
+                        : $"Removed package: {packageId}";
+                }
+
+                default:
+                    return $"Error: Unknown action '{action}'. Use 'list', 'add', or 'remove'.";
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEST RUNNER
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class RunTestsTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "run_tests",
+            Description = "Run Unity Test Runner tests (EditMode or PlayMode) and return results.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""mode"": { ""type"": ""string"", ""description"": ""Test mode: 'editmode' or 'playmode' (default: 'editmode')"" },
+                    ""filter"": { ""type"": ""string"", ""description"": ""Test name filter (partial match, optional)"" }
+                },
+                ""required"": []
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string mode = GetString(args, "mode")?.ToLowerInvariant() ?? "editmode";
+            string filter = GetString(args, "filter");
+
+            // Use the TestRunnerApi via reflection to avoid hard dependency on com.unity.test-framework
+            var apiType = Type.GetType("UnityEditor.TestTools.TestRunner.Api.TestRunnerApi, UnityEditor.TestRunner");
+            if (apiType == null)
+                return "Error: Unity Test Framework not installed. Add 'com.unity.test-framework' via Package Manager.";
+
+            var callbackType = Type.GetType("UnityEditor.TestTools.TestRunner.Api.ICallbacks, UnityEditor.TestRunner");
+            if (callbackType == null)
+                return "Error: Could not find test runner callback interface.";
+
+            // For now, trigger tests via menu item (most reliable cross-version approach)
+            string menuItem = mode == "playmode"
+                ? "Window/General/Test Runner"
+                : "Window/General/Test Runner";
+
+            EditorApplication.ExecuteMenuItem(menuItem);
+            return $"Opened Test Runner window. Select '{(mode == "playmode" ? "PlayMode" : "EditMode")}' tab " +
+                   $"and click 'Run All' to execute tests." +
+                   (string.IsNullOrEmpty(filter) ? "" : $"\nFilter suggestion: search for '{filter}'.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  SCREENSHOT CAPTURE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class ScreenshotCaptureTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "capture_screenshot",
+            Description = "Capture a screenshot of the Game View or Scene View and save it as a PNG file.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""view"": { ""type"": ""string"", ""description"": ""Which view to capture: 'game' or 'scene' (default: 'game')"" },
+                    ""path"": { ""type"": ""string"", ""description"": ""Save path (default: 'Assets/Screenshots/screenshot_<timestamp>.png')"" },
+                    ""supersize"": { ""type"": ""integer"", ""description"": ""Resolution multiplier for Game View (1-4, default: 1)"" }
+                },
+                ""required"": []
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string view = GetString(args, "view")?.ToLowerInvariant() ?? "game";
+            string path = GetString(args, "path");
+            int superSize = args["supersize"]?.Value<int>() ?? 1;
+            superSize = Mathf.Clamp(superSize, 1, 4);
+
+            if (string.IsNullOrEmpty(path))
+            {
+                string folder = "Assets/Screenshots";
+                if (!AssetDatabase.IsValidFolder(folder))
+                    AssetDatabase.CreateFolder("Assets", "Screenshots");
+                path = $"{folder}/screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+            }
+
+            // Ensure directory exists
+            string dir = System.IO.Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            if (view == "scene")
+            {
+                var sceneView = SceneView.lastActiveSceneView;
+                if (sceneView == null)
+                    return "Error: No Scene View is open.";
+
+                sceneView.Repaint();
+                var camera = sceneView.camera;
+                int width = (int)sceneView.position.width;
+                int height = (int)sceneView.position.height;
+
+                var rt = new RenderTexture(width, height, 24);
+                camera.targetTexture = rt;
+                camera.Render();
+
+                RenderTexture.active = rt;
+                var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                tex.Apply();
+
+                camera.targetTexture = null;
+                RenderTexture.active = null;
+                UnityEngine.Object.DestroyImmediate(rt);
+
+                byte[] bytes = tex.EncodeToPNG();
+                UnityEngine.Object.DestroyImmediate(tex);
+                System.IO.File.WriteAllBytes(path, bytes);
+            }
+            else
+            {
+                // Game view — use ScreenCapture
+                ScreenCapture.CaptureScreenshot(path, superSize);
+            }
+
+            AssetDatabase.Refresh();
+            return $"Screenshot saved to: {path}" +
+                   (view == "game" ? $" (supersize: {superSize}x)" : " (Scene View)");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  COMPONENT REFLECTION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class ComponentReflectionTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "component_properties",
+            Description = "Read or write any serialized property on a component using reflection. " +
+                          "Can read all properties, get a specific one, or set a value.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""action"": { ""type"": ""string"", ""description"": ""Action: 'read_all', 'get', 'set'"" },
+                    ""gameobject"": { ""type"": ""string"", ""description"": ""Name of the GameObject"" },
+                    ""component"": { ""type"": ""string"", ""description"": ""Component type name (e.g. 'Rigidbody', 'Camera', 'MeshRenderer')"" },
+                    ""property"": { ""type"": ""string"", ""description"": ""Property name to get or set"" },
+                    ""value"": { ""description"": ""Value to set (string, number, boolean, or object with x/y/z/w)"" }
+                },
+                ""required"": [""action"", ""gameobject"", ""component""]
+            }")
+        };
+
+        protected override string Execute(JObject args)
+        {
+            string action = GetString(args, "action")?.ToLowerInvariant();
+            string goName = GetString(args, "gameobject", "name");
+            string compName = GetString(args, "component");
+            string propName = GetString(args, "property");
+
+            var go = GameObject.Find(goName);
+            if (go == null)
+                return $"Error: GameObject '{goName}' not found.";
+
+            var component = FindComponent(go, compName);
+            if (component == null)
+                return $"Error: Component '{compName}' not found on '{goName}'.";
+
+            switch (action)
+            {
+                case "read_all":
+                    return ReadAllProperties(component);
+                case "get":
+                    if (string.IsNullOrEmpty(propName))
+                        return "Error: 'property' is required for 'get' action.";
+                    return GetProperty(component, propName);
+                case "set":
+                    if (string.IsNullOrEmpty(propName))
+                        return "Error: 'property' is required for 'set' action.";
+                    var value = GetToken(args, "value");
+                    if (value == null)
+                        return "Error: 'value' is required for 'set' action.";
+                    return SetProperty(component, propName, value);
+                default:
+                    return $"Error: Unknown action '{action}'. Use 'read_all', 'get', or 'set'.";
+            }
+        }
+
+        private Component FindComponent(GameObject go, string typeName)
+        {
+            foreach (var comp in go.GetComponents<Component>())
+            {
+                if (comp == null) continue;
+                var type = comp.GetType();
+                if (type.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase) ||
+                    type.FullName?.Equals(typeName, StringComparison.OrdinalIgnoreCase) == true)
+                    return comp;
+            }
+            return null;
+        }
+
+        private string ReadAllProperties(Component component)
+        {
+            var so = new SerializedObject(component);
+            var sb = new StringBuilder();
+            sb.AppendLine($"Properties of {component.GetType().Name}:");
+
+            var prop = so.GetIterator();
+            bool enter = true;
+            while (prop.NextVisible(enter))
+            {
+                enter = false;
+                sb.AppendLine($"  {prop.propertyPath} ({prop.propertyType}) = {GetSerializedValue(prop)}");
+            }
+            return sb.ToString();
+        }
+
+        private string GetProperty(Component component, string propName)
+        {
+            var so = new SerializedObject(component);
+            var prop = so.FindProperty(propName);
+            if (prop == null)
+            {
+                // Try m_ prefix
+                prop = so.FindProperty("m_" + char.ToUpper(propName[0]) + propName.Substring(1));
+            }
+            if (prop == null)
+                return $"Error: Property '{propName}' not found. Use action 'read_all' to see available properties.";
+
+            return $"{prop.propertyPath} ({prop.propertyType}) = {GetSerializedValue(prop)}";
+        }
+
+        private string SetProperty(Component component, string propName, JToken value)
+        {
+            var so = new SerializedObject(component);
+            var prop = so.FindProperty(propName);
+            if (prop == null)
+                prop = so.FindProperty("m_" + char.ToUpper(propName[0]) + propName.Substring(1));
+            if (prop == null)
+                return $"Error: Property '{propName}' not found.";
+
+            Undo.RecordObject(component, $"Set {propName}");
+
+            try
+            {
+                switch (prop.propertyType)
+                {
+                    case SerializedPropertyType.Integer:
+                        prop.intValue = value.Value<int>();
+                        break;
+                    case SerializedPropertyType.Float:
+                        prop.floatValue = value.Value<float>();
+                        break;
+                    case SerializedPropertyType.Boolean:
+                        prop.boolValue = value.Value<bool>();
+                        break;
+                    case SerializedPropertyType.String:
+                        prop.stringValue = value.ToString();
+                        break;
+                    case SerializedPropertyType.Enum:
+                        if (value.Type == JTokenType.Integer)
+                            prop.enumValueIndex = value.Value<int>();
+                        else
+                        {
+                            string enumStr = value.ToString();
+                            int idx = Array.IndexOf(prop.enumDisplayNames, enumStr);
+                            if (idx >= 0) prop.enumValueIndex = idx;
+                            else return $"Error: '{enumStr}' is not a valid enum value. Options: {string.Join(", ", prop.enumDisplayNames)}";
+                        }
+                        break;
+                    case SerializedPropertyType.Vector2:
+                        prop.vector2Value = new Vector2(
+                            value["x"]?.Value<float>() ?? 0f,
+                            value["y"]?.Value<float>() ?? 0f);
+                        break;
+                    case SerializedPropertyType.Vector3:
+                        prop.vector3Value = new Vector3(
+                            value["x"]?.Value<float>() ?? 0f,
+                            value["y"]?.Value<float>() ?? 0f,
+                            value["z"]?.Value<float>() ?? 0f);
+                        break;
+                    case SerializedPropertyType.Color:
+                        prop.colorValue = new Color(
+                            value["r"]?.Value<float>() ?? 0f,
+                            value["g"]?.Value<float>() ?? 0f,
+                            value["b"]?.Value<float>() ?? 0f,
+                            value["a"]?.Value<float>() ?? 1f);
+                        break;
+                    default:
+                        return $"Error: Cannot set property type '{prop.propertyType}' directly.";
+                }
+
+                so.ApplyModifiedProperties();
+                return $"Set {component.GetType().Name}.{propName} = {value}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error setting property: {ex.Message}";
+            }
+        }
+
+        private string GetSerializedValue(SerializedProperty prop)
+        {
+            switch (prop.propertyType)
+            {
+                case SerializedPropertyType.Integer: return prop.intValue.ToString();
+                case SerializedPropertyType.Float: return prop.floatValue.ToString("F4");
+                case SerializedPropertyType.Boolean: return prop.boolValue.ToString();
+                case SerializedPropertyType.String: return $"\"{prop.stringValue}\"";
+                case SerializedPropertyType.Enum: return prop.enumDisplayNames[prop.enumValueIndex];
+                case SerializedPropertyType.Vector2: return prop.vector2Value.ToString();
+                case SerializedPropertyType.Vector3: return prop.vector3Value.ToString();
+                case SerializedPropertyType.Vector4: return prop.vector4Value.ToString();
+                case SerializedPropertyType.Color: return prop.colorValue.ToString();
+                case SerializedPropertyType.ObjectReference:
+                    return prop.objectReferenceValue != null ? prop.objectReferenceValue.name : "null";
+                case SerializedPropertyType.LayerMask: return prop.intValue.ToString();
+                case SerializedPropertyType.Quaternion: return prop.quaternionValue.eulerAngles.ToString();
+                case SerializedPropertyType.Rect: return prop.rectValue.ToString();
+                case SerializedPropertyType.Bounds: return prop.boundsValue.ToString();
+                default: return $"<{prop.propertyType}>";
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  BATCH EXECUTION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public class BatchExecuteTool : UnaiEditorTool
+    {
+        public override UnaiToolDefinition Definition => new()
+        {
+            Name = "batch_execute",
+            Description = "Execute multiple tool calls in a single atomic batch. " +
+                          "All operations share one Undo group. If any fails, previous operations in the batch are NOT rolled back " +
+                          "but you can Undo the entire batch as one step.",
+            ParametersSchema = JObject.Parse(@"{
+                ""type"": ""object"",
+                ""properties"": {
+                    ""operations"": {
+                        ""type"": ""array"",
+                        ""description"": ""Array of operations to execute sequentially"",
+                        ""items"": {
+                            ""type"": ""object"",
+                            ""properties"": {
+                                ""tool"": { ""type"": ""string"", ""description"": ""Tool name to call"" },
+                                ""args"": { ""type"": ""object"", ""description"": ""Arguments for the tool"" }
+                            },
+                            ""required"": [""tool""]
+                        }
+                    }
+                },
+                ""required"": [""operations""]
+            }")
+        };
+
+        private UnaiToolRegistry _registry;
+
+        public BatchExecuteTool(UnaiToolRegistry registry)
+        {
+            _registry = registry;
+        }
+
+        protected override string Execute(JObject args)
+        {
+            var operations = args["operations"] as JArray;
+            if (operations == null || operations.Count == 0)
+                return "Error: 'operations' array is required and must not be empty.";
+
+            if (operations.Count > 20)
+                return "Error: Maximum 20 operations per batch.";
+
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName("Batch Execute");
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Batch execution ({operations.Count} operations):");
+            sb.AppendLine();
+
+            int success = 0;
+            int failed = 0;
+
+            for (int i = 0; i < operations.Count; i++)
+            {
+                var op = operations[i] as JObject;
+                string toolName = op?["tool"]?.ToString();
+                var toolArgs = op?["args"] as JObject ?? new JObject();
+
+                if (string.IsNullOrEmpty(toolName))
+                {
+                    sb.AppendLine($"  [{i + 1}] SKIP — missing tool name");
+                    failed++;
+                    continue;
+                }
+
+                // Don't allow recursive batch
+                if (toolName == "batch_execute")
+                {
+                    sb.AppendLine($"  [{i + 1}] SKIP — cannot nest batch_execute");
+                    failed++;
+                    continue;
+                }
+
+                var tool = _registry.Get(toolName) ?? _registry.GetFuzzy(toolName);
+                if (tool == null)
+                {
+                    sb.AppendLine($"  [{i + 1}] FAIL — unknown tool '{toolName}'");
+                    failed++;
+                    continue;
+                }
+
+                try
+                {
+                    var call = new UnaiToolCall
+                    {
+                        Id = $"batch_{i}",
+                        ToolName = tool.Definition.Name,
+                        ArgumentsJson = toolArgs.ToString(Formatting.None)
+                    };
+
+                    var result = tool.ExecuteAsync(call).GetAwaiter().GetResult();
+                    if (result.IsError)
+                    {
+                        sb.AppendLine($"  [{i + 1}] FAIL {toolName}: {result.Content}");
+                        failed++;
+                    }
+                    else
+                    {
+                        // Show truncated result
+                        string preview = result.Content;
+                        if (preview.Length > 150)
+                            preview = preview.Substring(0, 150) + "...";
+                        sb.AppendLine($"  [{i + 1}] OK {toolName}: {preview}");
+                        success++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine($"  [{i + 1}] ERROR {toolName}: {ex.Message}");
+                    failed++;
+                }
+            }
+
+            Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
+
+            sb.AppendLine();
+            sb.AppendLine($"Completed: {success} succeeded, {failed} failed. (Undo as one step)");
+            return sb.ToString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  TOOL REGISTRY
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -2434,6 +3139,23 @@ namespace UnAI.Editor.Assistant
 
             // Physics
             registry.Register(new CreatePhysicsSetupTool());
+
+            // Play mode
+            registry.Register(new PlayModeControlTool());
+
+            // Asset management
+            registry.Register(new AssetDatabaseTool());
+            registry.Register(new PackageManagerTool());
+
+            // Testing & capture
+            registry.Register(new RunTestsTool());
+            registry.Register(new ScreenshotCaptureTool());
+
+            // Reflection
+            registry.Register(new ComponentReflectionTool());
+
+            // Batch
+            registry.Register(new BatchExecuteTool(registry));
 
             // Editor control
             registry.Register(new ExecuteMenuItemTool());

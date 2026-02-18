@@ -11,7 +11,7 @@ Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini
 |------|-------------|---------|
 | **Runtime Chat** | Call any LLM from your game at runtime | NPC dialogue, AI mechanics, chatbots |
 | **AI Agent** | Multi-step reasoning with tool calling and memory | Autonomous NPCs, game assistants |
-| **Editor Assistant** | AI chat window inside the Unity Editor (24 tools) | Scene inspection, GameObject creation, script editing |
+| **Editor Assistant** | AI chat window inside the Unity Editor (31 tools) | Scene inspection, GameObject creation, script editing |
 | **MCP Server** | Expose Unity tools to external AI clients via MCP protocol | Control Unity from Claude Desktop, Cursor, or any MCP client |
 
 All pure C#. No Node.js, no Python, no external processes, no separate frameworks.
@@ -50,7 +50,7 @@ Most Unity AI solutions force you to choose: a chat SDK for one provider, a sepa
 - **AI Agent system** — multi-step reasoning with tool calling, conversation memory, and observe-think-act loop
 - **Tool/Function calling** — native support for OpenAI, Anthropic, and Gemini; text-based fallback for all others
 - **MCP Server** — built-in Model Context Protocol server lets Claude Desktop, Cursor, and other MCP clients control Unity
-- **Editor AI Assistant** — built-in editor window with 24 tools for scene inspection, GameObject creation, physics setup, and more
+- **Editor AI Assistant** — built-in editor window with 31 tools for scene inspection, GameObject creation, physics setup, asset management, and more
 - **Structured output / JSON mode** — force JSON responses with optional schema validation across all providers
 - **Conversation memory** — token-aware history management with automatic truncation
 - **Real-time streaming** — token-by-token responses on the main thread, perfect for chat UIs
@@ -282,24 +282,30 @@ conversation.AddAssistant(response.Content);
 
 Open **Window > UnAI > AI Assistant** to get a chat-powered assistant directly in the Unity Editor.
 
-### Built-in tools (24)
+### Built-in tools (31)
 
 | Category | Tools |
 |----------|-------|
 | **Scene** | `inspect_scene`, `find_gameobject`, `get_selection`, `focus_scene_view` |
 | **GameObjects** | `create_gameobject`, `modify_gameobject`, `inspect_gameobject`, `duplicate_gameobject` |
-| **Components** | `add_component_configured`, `create_physics_setup`, `set_layer_tag` |
+| **Components** | `add_component_configured`, `create_physics_setup`, `set_layer_tag`, `component_properties` |
 | **Materials & Lighting** | `create_material`, `create_light` |
 | **Prefabs** | `create_prefab` |
 | **Scripts & Assets** | `read_script`, `create_script`, `modify_script`, `list_assets`, `search_project` |
+| **Asset Management** | `manage_assets` (create folder, move, copy, delete, rename, refresh, find by type) |
+| **Packages** | `manage_packages` (list, add, remove Unity packages) |
+| **Play Mode** | `play_mode` (play, pause, stop, step, status) |
+| **Capture** | `capture_screenshot` (Game View or Scene View to PNG) |
+| **Testing** | `run_tests` (EditMode / PlayMode via Test Runner) |
 | **Project** | `get_project_settings` |
+| **Batch** | `batch_execute` (multiple operations in one atomic Undo step) |
 | **Editor** | `execute_menu_item`, `undo`, `get_console_logs`, `log_message` |
 
 The assistant uses the same agent system, so it reasons through multi-step tasks and calls tools automatically.
 
 ## MCP Server
 
-UNAI includes a built-in **Model Context Protocol (MCP)** server that exposes all 24 editor tools to external AI clients. Pure C# — no Node.js, no npm, no external processes.
+UNAI includes a built-in **Model Context Protocol (MCP)** server that exposes all 31 editor tools to external AI clients. Pure C# — no Node.js, no npm, no external processes.
 
 ### Start the server
 
