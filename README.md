@@ -451,6 +451,12 @@ API key resolution order:
 - Unity 6 (6000.0+)
 - Newtonsoft JSON (`com.unity.nuget.newtonsoft-json`) - added automatically
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get started.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
 ## License
 
 MIT - see [LICENSE](LICENSE). Use it however you want, just keep the copyright notice.
