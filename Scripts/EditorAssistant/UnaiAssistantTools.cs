@@ -2330,7 +2330,7 @@ namespace UnAI.Editor.Assistant
             var frictionToken = GetToken(args, "friction");
             if (bouncinessToken != null || frictionToken != null)
             {
-                var mat = new PhysicMaterial($"{name}_PhysMat");
+                var mat = new PhysicsMaterial($"{name}_PhysMat");
                 if (bouncinessToken != null)
                     mat.bounciness = bouncinessToken.Value<float>();
                 if (frictionToken != null)
