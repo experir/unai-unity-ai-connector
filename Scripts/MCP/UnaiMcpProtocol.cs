@@ -13,7 +13,7 @@ namespace UnAI.MCP
     {
         public const string ProtocolVersion = "2025-03-26";
         public const string ServerName = "unai-unity";
-        public const string ServerVersion = "1.0.0";
+        public static string ServerVersion => UnaiVersion.Get();
 
         public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, CancellationToken ct)
         {
