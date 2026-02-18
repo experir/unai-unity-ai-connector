@@ -1,7 +1,16 @@
 # UNAI - Universal AI Connector for Unity
 
+<p align="center">
+  <img src="Scripts/Editor/Resources/UnaiLogo.png" alt="UNAI Logo" width="128"/>
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Unity 6+](https://img.shields.io/badge/Unity-6000.0%2B-black.svg)](https://unity.com)
+[![GitHub release](https://img.shields.io/github/v/release/experir/unai-unity-ai-connector?include_prereleases&label=Release)](https://github.com/experir/unai-unity-ai-connector/releases)
+[![GitHub stars](https://img.shields.io/github/stars/experir/unai-unity-ai-connector?style=flat)](https://github.com/experir/unai-unity-ai-connector/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/experir/unai-unity-ai-connector)](https://github.com/experir/unai-unity-ai-connector/issues)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/experir/unai-unity-ai-connector/pulls)
+[![.NET](https://img.shields.io/badge/.NET-C%23-blue.svg)](https://docs.microsoft.com/en-us/dotnet/csharp/)
 
 Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and more — with a single, unified C# API. Use cloud models or run local LLMs. Swap providers with one line of code.
 
