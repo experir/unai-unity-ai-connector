@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnAI.Tools;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -2202,8 +2203,8 @@ namespace UnAI.Editor.Assistant
             sb.AppendLine($"  Fullscreen mode: {PlayerSettings.fullScreenMode}");
             sb.AppendLine($"  Run in background: {PlayerSettings.runInBackground}");
             sb.AppendLine($"  Color space: {PlayerSettings.colorSpace}");
-            sb.AppendLine($"  Scripting backend: {PlayerSettings.GetScriptingBackend(EditorUserBuildSettings.selectedBuildTargetGroup)}");
-            sb.AppendLine($"  API compatibility: {PlayerSettings.GetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup)}");
+            sb.AppendLine($"  Scripting backend: {PlayerSettings.GetScriptingBackend(NamedBuildTarget.FromBuildTargetGroup(EditorUserBuildSettings.selectedBuildTargetGroup))}");
+            sb.AppendLine($"  API compatibility: {PlayerSettings.GetApiCompatibilityLevel(NamedBuildTarget.FromBuildTargetGroup(EditorUserBuildSettings.selectedBuildTargetGroup))}");
             sb.AppendLine($"  Target platform: {EditorUserBuildSettings.activeBuildTarget}");
             return sb.ToString();
         }

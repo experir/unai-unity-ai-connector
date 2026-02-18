@@ -55,8 +55,6 @@ namespace UnAI.Editor.Assistant
         // Debug panel state
         [SerializeField] private bool _debugFoldout;
         [SerializeField] private bool _debugShowPerMessage = true;
-        [SerializeField] private int _sessionFallbackCount;
-        [SerializeField] private string _lastFallbackInfo;
         [SerializeField] private bool _autoSaveEnabled;
         [SerializeField] private int _responseFormatIndex; // 0=Text, 1=JsonObject, 2=JsonSchema
 
@@ -227,7 +225,7 @@ namespace UnAI.Editor.Assistant
             EditorGUILayout.Space(20);
             EditorGUILayout.HelpBox(
                 "No UnaiGlobalConfig found.\n\n" +
-                "Create one via Window > UnAI > Create Global Config,\n" +
+                "Create one via Window > UnAI > Hub > Core — Setup Wizard,\n" +
                 "or assign a config to the UnaiManager in your scene.",
                 MessageType.Warning);
 
@@ -301,8 +299,6 @@ namespace UnAI.Editor.Assistant
                 _sessionTotalCompletionTokens = 0;
                 _sessionTotalTokens = 0;
                 _sessionTotalTimeMs = 0;
-                _sessionFallbackCount = 0;
-                _lastFallbackInfo = null;
             }
 
             EditorGUILayout.EndHorizontal();

@@ -157,9 +157,7 @@ Alternatively, add it directly to your `Packages/manifest.json`:
 
 ### 1. Create a config
 
-**Assets > Create > UnAI > Global Configuration**
-
-Or use the setup wizard: **Window > UnAI > Setup Wizard**
+Open **Window > UnAI > Hub** and click **Core — Setup Wizard**, or go directly to **Window > UnAI > Setup Wizard**.
 
 ### 2. Set your API keys
 
