@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using TMPro;
 using UnAI.Core;
-using UnAI.Config;
 using UnAI.Models;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,9 +12,6 @@ namespace UnAI.Examples
 {
     public class UnaiExampleChat : MonoBehaviour
     {
-        [Header("Configuration")]
-        [SerializeField] private UnaiGlobalConfig _config;
-
         [Header("UI References")]
         [SerializeField] private TMP_Dropdown _providerDropdown;
         [SerializeField] private TMP_InputField _systemPromptInput;
@@ -53,7 +49,14 @@ namespace UnAI.Examples
 
         private void Start()
         {
-            SetupManager();
+            EnsureManager();
+
+            if (UnaiManager.Instance == null || UnaiManager.Instance.Config == null)
+            {
+                ShowMissingConfigOverlay();
+                return;
+            }
+
             SetupProviderDropdown();
             SetupButtons();
 
@@ -69,16 +72,15 @@ namespace UnAI.Examples
             Log("Set environment variables (OPENAI_API_KEY, etc.) or configure keys in the UnaiGlobalConfig asset.");
         }
 
-        private void SetupManager()
+        private void EnsureManager()
         {
             if (UnaiManager.Instance != null) return;
 
             var manager = GetComponent<UnaiManager>();
             if (manager == null)
+                manager = FindAnyObjectByType<UnaiManager>();
+            if (manager == null)
                 manager = gameObject.AddComponent<UnaiManager>();
-
-            var config = _config != null ? _config : ScriptableObject.CreateInstance<UnaiGlobalConfig>();
-            manager.Initialize(config);
         }
 
         private void SetupProviderDropdown()
@@ -316,6 +318,52 @@ namespace UnAI.Examples
                 Canvas.ForceUpdateCanvases();
             if (scroll != null)
                 scroll.verticalNormalizedPosition = 0f;
+        }
+
+        private void ShowMissingConfigOverlay()
+        {
+            Debug.LogWarning("[UNAI] No UnaiGlobalConfig assigned. Assign one in the Inspector on the UnaiManager component.");
+
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) canvas = FindAnyObjectByType<Canvas>();
+            if (canvas == null) return;
+
+            // Create overlay
+            var overlay = new GameObject("MissingConfigOverlay");
+            overlay.transform.SetParent(canvas.transform, false);
+
+            var overlayRect = overlay.AddComponent<RectTransform>();
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.sizeDelta = Vector2.zero;
+
+            var overlayImage = overlay.AddComponent<Image>();
+            overlayImage.color = new Color(0.12f, 0.12f, 0.12f, 0.95f);
+
+            // Create message text
+            var textObj = new GameObject("Message");
+            textObj.transform.SetParent(overlay.transform, false);
+
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = new Vector2(0.1f, 0.3f);
+            textRect.anchorMax = new Vector2(0.9f, 0.7f);
+            textRect.sizeDelta = Vector2.zero;
+
+            var text = textObj.AddComponent<TextMeshProUGUI>();
+            text.text =
+                "<size=24><b>UnaiGlobalConfig not assigned</b></size>\n\n" +
+                "<size=16>" +
+                "The <b>UnaiManager</b> needs a <b>UnaiGlobalConfig</b> asset to work.\n\n" +
+                "<b>How to fix:</b>\n" +
+                "  1. Create a config: <i>Assets > Create > UnAI > Global Configuration</i>\n" +
+                "  2. Configure your API keys in the new asset\n" +
+                "  3. Select the <b>UnaiManager</b> GameObject and drag the config into the\n" +
+                "     <b>Configuration > Config</b> field in the Inspector\n\n" +
+                "Or use <b>Window > UnAI > Hub > Core  -  Setup Wizard</b> for guided setup." +
+                "</size>";
+            text.color = new Color(0.9f, 0.9f, 0.9f);
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableWordWrapping = true;
         }
 
         private void OnDestroy()

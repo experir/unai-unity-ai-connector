@@ -11,6 +11,9 @@
 [![GitHub issues](https://img.shields.io/github/issues/experir/unai-unity-ai-connector)](https://github.com/experir/unai-unity-ai-connector/issues)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/experir/unai-unity-ai-connector/pulls)
 [![.NET](https://img.shields.io/badge/.NET-C%23-blue.svg)](https://docs.microsoft.com/en-us/dotnet/csharp/)
+[![Documentation](https://img.shields.io/badge/Docs-experir.com-blue.svg)](https://www.experir.com/products/unai/docs)
+
+> **[Read the full documentation →](https://www.experir.com/products/unai/docs)**
 
 Connect Unity to **any AI provider** — OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and more — with a single, unified C# API. Use cloud models or run local LLMs. Swap providers with one line of code.
 
@@ -450,6 +453,23 @@ API key resolution order:
 
 - Unity 6 (6000.0+)
 - Newtonsoft JSON (`com.unity.nuget.newtonsoft-json`) - added automatically
+
+## Documentation
+
+For detailed guides, API references, and examples, visit the full documentation:
+
+**[→ UNAI Documentation](https://www.experir.com/products/unai/docs)**
+
+| Guide | Description |
+|-------|-------------|
+| [Introduction](https://www.experir.com/products/unai/docs) | Overview, features, and architecture |
+| [Installation](https://www.experir.com/products/unai/docs/installation) | Setup instructions and requirements |
+| [Quick Start](https://www.experir.com/products/unai/docs/quick-start) | Make your first AI request in 5 minutes |
+| [Supported Providers](https://www.experir.com/products/unai/docs/providers) | All 9 providers with configuration details |
+| [Streaming](https://www.experir.com/products/unai/docs/streaming) | Real-time token-by-token responses |
+| [AI Agent System](https://www.experir.com/products/unai/docs/agent-system) | Tool calling, memory, and multi-step reasoning |
+| [Editor Assistant](https://www.experir.com/products/unai/docs/editor-assistant) | 32 built-in editor tools |
+| [MCP Server](https://www.experir.com/products/unai/docs/mcp-server) | Connect Claude Desktop, Cursor, and more |
 
 ## Contributing
 
