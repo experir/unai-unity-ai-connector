@@ -76,7 +76,7 @@ namespace UnAI.Editor
 
             if (_logo != null)
             {
-                const float maxW = 128;
+                const float maxW = 64;
                 float aspect = (float)_logo.height / _logo.width;
                 float w = Mathf.Min(maxW, position.width - 40);
                 float h = w * aspect;
