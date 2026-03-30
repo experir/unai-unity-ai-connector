@@ -172,7 +172,7 @@ namespace UnAI.MCP
             {
                 try
                 {
-                    result = await UnaiMcpProtocol.HandleRequest(body, _tools, ct);
+                    result = await UnaiMcpProtocol.HandleRequest(body, _tools,_transport, ct);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception ex)
@@ -218,11 +218,13 @@ namespace UnAI.MCP
             var client = _transport.AddClient(response);
 
             // Send initial endpoint event so client knows where to POST
-            await client.SendEvent(JsonConvert.SerializeObject(new
-            {
-                @event = "endpoint",
-                url = Url
-            }));
+            // await client.SendEvent(JsonConvert.SerializeObject(new
+            // {
+            //     @event = "endpoint",
+            //     url = Url
+            // }));
+            // 正确
+            await client.SendEventAsync(Url, eventType: "endpoint");
 
             // Keep connection alive until cancelled or disconnected
             try
@@ -230,6 +232,7 @@ namespace UnAI.MCP
                 while (!ct.IsCancellationRequested && !client.IsClosed)
                 {
                     await Task.Delay(15000, ct); // Keep-alive interval
+                    await client.SendKeepAliveAsync(); // ← 用注释心跳，不触发客户端事件
                     _transport.CleanupDisconnected();
                 }
             }
