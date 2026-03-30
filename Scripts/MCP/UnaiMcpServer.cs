@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -23,6 +24,7 @@ namespace UnAI.MCP
         private CancellationTokenSource _cts;
         private UnaiToolRegistry _tools;
         private readonly UnaiMcpTransport _transport = new();
+        private readonly ConcurrentDictionary<string, string> _sessionMap = new();
 
         public void Start(int port, UnaiToolRegistry tools)
         {
@@ -74,7 +76,10 @@ namespace UnAI.MCP
                 _listener?.Stop();
                 _listener?.Close();
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             _listener = null;
             IsRunning = false;
@@ -133,13 +138,13 @@ namespace UnAI.MCP
 
             if (request.HttpMethod == "GET")
             {
-                // SSE connection
+                // SSE connection (for backward compatibility)
                 await HandleSseConnection(response, ct);
             }
             else if (request.HttpMethod == "POST")
             {
-                // JSON-RPC request
-                await HandleJsonRpc(request, response, ct);
+                // Streamable HTTP JSON-RPC request
+                await HandleStreamableHttp(request, response, context, ct);
             }
             else
             {
@@ -148,8 +153,51 @@ namespace UnAI.MCP
             }
         }
 
-        private async Task HandleJsonRpc(HttpListenerRequest request, HttpListenerResponse response,
-            CancellationToken ct)
+        private async Task HandleSseConnection(HttpListenerResponse response, CancellationToken ct)
+        {
+            var client = _transport.AddClient(response);
+            
+            // Store mapping for this client
+            _sessionMap[client.Id] = client.Id;
+            
+            // Send initial endpoint event so client knows where to POST
+            await client.SendEventAsync(Url, eventType: "endpoint");
+            
+            // Send client ID to the client
+            var clientInfo = new JObject
+            {
+                ["clientId"] = client.Id,
+                ["timestamp"] = DateTime.UtcNow.ToString("o")
+            };
+            await client.SendEventAsync(clientInfo.ToString(Formatting.None), eventType: "client_ready");
+
+            // Keep connection alive until cancelled or disconnected
+            try
+            {
+                while (!ct.IsCancellationRequested && !client.IsClosed)
+                {
+                    await Task.Delay(15000, ct); // Keep-alive interval
+                    await client.SendKeepAliveAsync();
+                    _transport.CleanupDisconnected();
+                    
+                    // Clean up stale session mappings
+                    foreach (var kvp in _sessionMap)
+                    {
+                        if (!_transport.HasClient(kvp.Key))
+                            _sessionMap.TryRemove(kvp.Key, out _);
+                    }
+                }
+            }
+            catch (TaskCanceledException) { }
+            finally
+            {
+                _transport.RemoveClient(client.Id);
+                _sessionMap.TryRemove(client.Id, out _);
+            }
+        }
+
+        private async Task HandleStreamableHttp(HttpListenerRequest request, HttpListenerResponse response,
+            HttpListenerContext context, CancellationToken ct)
         {
             string body;
             using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
@@ -164,6 +212,15 @@ namespace UnAI.MCP
                 return;
             }
 
+            // Get or create session ID (Streamable HTTP uses mcp-session-id header)
+            string sessionId = GetOrCreateSessionId(context);
+            
+            // Set session ID in response header
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                response.Headers.Add("mcp-session-id", sessionId);
+            }
+
             // Execute tool calls on Unity main thread
             string result = null;
             var tcs = new TaskCompletionSource<string>();
@@ -172,7 +229,7 @@ namespace UnAI.MCP
             {
                 try
                 {
-                    result = await UnaiMcpProtocol.HandleRequest(body, _tools,_transport, ct);
+                    result = await UnaiMcpProtocol.HandleRequest(body, _tools, _transport, sessionId, ct);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception ex)
@@ -213,41 +270,31 @@ namespace UnAI.MCP
             WriteResponse(response, result);
         }
 
-        private async Task HandleSseConnection(HttpListenerResponse response, CancellationToken ct)
+        private string GetOrCreateSessionId(HttpListenerContext context)
         {
-            var client = _transport.AddClient(response);
-
-            // Send initial endpoint event so client knows where to POST
-            // await client.SendEvent(JsonConvert.SerializeObject(new
-            // {
-            //     @event = "endpoint",
-            //     url = Url
-            // }));
-            // 正确
-            await client.SendEventAsync(Url, eventType: "endpoint");
-
-            // Keep connection alive until cancelled or disconnected
-            try
-            {
-                while (!ct.IsCancellationRequested && !client.IsClosed)
-                {
-                    await Task.Delay(15000, ct); // Keep-alive interval
-                    await client.SendKeepAliveAsync(); // ← 用注释心跳，不触发客户端事件
-                    _transport.CleanupDisconnected();
-                }
-            }
-            catch (TaskCanceledException) { }
-            finally
-            {
-                _transport.RemoveClient(client.Id);
-            }
+            // Try to get session ID from header (Streamable HTTP standard)
+            var sessionId = context.Request.Headers["mcp-session-id"];
+            if (!string.IsNullOrEmpty(sessionId) && _sessionMap.ContainsKey(sessionId))
+                return sessionId;
+            
+            // Try X-Client-Id for backward compatibility
+            var clientId = context.Request.Headers["X-Client-Id"];
+            if (!string.IsNullOrEmpty(clientId) && _sessionMap.ContainsKey(clientId))
+                return clientId;
+            
+            // Create new session for initialize request
+            var newSessionId = Guid.NewGuid().ToString("N");
+            _sessionMap[newSessionId] = newSessionId;
+            Debug.Log($"[UNAI MCP] Created new session: {newSessionId}");
+            return newSessionId;
         }
 
         private static void SetCorsHeaders(HttpListenerResponse response)
         {
             response.Headers.Add("Access-Control-Allow-Origin", "*");
             response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-Id, mcp-session-id");
+            response.Headers.Add("Access-Control-Expose-Headers", "mcp-session-id");
         }
 
         private static void WriteResponse(HttpListenerResponse response, string body)

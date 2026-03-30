@@ -15,7 +15,8 @@ namespace UnAI.MCP
         public const string ServerName = "unai-unity";
         public static string ServerVersion => UnaiVersion.Get();
 
-        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools,UnaiMcpTransport transport, CancellationToken ct)
+        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, 
+            UnaiMcpTransport transport, string clientId, CancellationToken ct)
         {
             JObject request;
             try
@@ -49,7 +50,7 @@ namespace UnAI.MCP
                     "initialize" => HandleInitialize(id),
                     "ping" => MakeResult(id, new JObject()),
                     "tools/list" => HandleToolsList(id, tools),
-                    "tools/call" => await HandleToolsCall(id, parameters, tools,transport, ct),
+                    "tools/call" => await HandleToolsCall(id, parameters, tools, transport, clientId, ct),
                     _ => MakeError(id, -32601, $"Method not found: {method}")
                 };
             }
@@ -123,7 +124,7 @@ namespace UnAI.MCP
         }
 
         private static async Task<string> HandleToolsCall(JToken id, JObject parameters,
-            UnaiToolRegistry tools,UnaiMcpTransport transport, CancellationToken ct)
+            UnaiToolRegistry tools, UnaiMcpTransport transport, string clientId, CancellationToken ct)
         {
             string toolName = parameters["name"]?.ToString();
             if (string.IsNullOrEmpty(toolName))
@@ -144,10 +145,10 @@ namespace UnAI.MCP
 
             Debug.Log($"[UNAI MCP] Calling tool '{toolName}' with args: {call.ArgumentsJson}");
 
-            // 开始前推送进度（progressToken 用请求 id）
-            if (transport != null)
+            // Send progress notification to the specific client only
+            if (transport != null && !string.IsNullOrEmpty(clientId))
             {
-                await transport.BroadcastNotification("notifications/progress", new
+                await transport.SendToClient(clientId, "notifications/progress", new
                 {
                     progressToken = id?.ToString(),
                     progress = 0,
@@ -158,10 +159,10 @@ namespace UnAI.MCP
             
             var toolResult = await tool.ExecuteAsync(call, ct);
             
-            // 完成后推送
-            if (transport != null)
+            // Send completion notification to the specific client only
+            if (transport != null && !string.IsNullOrEmpty(clientId))
             {
-                await transport.BroadcastNotification("notifications/progress", new
+                await transport.SendToClient(clientId, "notifications/progress", new
                 {
                     progressToken = id?.ToString(),
                     progress = 1,
