@@ -18,7 +18,7 @@ namespace UnAI.MCP
         public int Port { get; private set; }
         public bool IsRunning { get; private set; }
         public int ConnectedClients => _transport.ClientCount;
-        public string Url => $"http://localhost:{Port}/mcp";
+        public string Url => $"http://0.0.0.0:{Port}/mcp";
 
         private HttpListener _listener;
         private CancellationTokenSource _cts;
@@ -41,11 +41,13 @@ namespace UnAI.MCP
             try
             {
                 _listener = new HttpListener();
+                //_listener.Prefixes.Add($"http://0.0.0.0:{port}/");
+                _listener.Prefixes.Add($"http://+:{port}/");
                 _listener.Prefixes.Add($"http://localhost:{port}/");
                 _listener.Start();
                 IsRunning = true;
 
-                Debug.Log($"[UNAI MCP] Server started on {Url}");
+                Debug.Log($"[UNAI MCP] Server started on http://0.0.0.0:{Port}/mcp");
                 Debug.Log($"[UNAI MCP] Exposing {tools.GetAllDefinitions().Count} tools via MCP protocol.");
 
                 // Start accepting connections on a background thread
@@ -59,7 +61,7 @@ namespace UnAI.MCP
                 if (ex is HttpListenerException)
                 {
                     Debug.LogError("[UNAI MCP] Hint: On Windows, you may need to run Unity as Administrator, " +
-                                   "or grant permission with: netsh http add urlacl url=http://localhost:" + port + "/ user=Everyone");
+                                   "or grant permission with: netsh http add urlacl url=http://+:" + port + "/ user=Everyone");
                 }
             }
         }

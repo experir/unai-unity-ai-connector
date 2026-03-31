@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -9,6 +10,7 @@ using UnAI.Memory;
 using UnAI.Models;
 using UnAI.Tools;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace UnAI.Agent
 {
@@ -77,7 +79,7 @@ namespace UnAI.Agent
             {
                 token.ThrowIfCancellationRequested();
 
-                float stepStart = Time.realtimeSinceStartup;
+                var stepTimer = Stopwatch.StartNew();
 
                 // Build effective system prompt (inject tool descriptions for non-tool providers)
                 string effectiveSystemPrompt = _config.SystemPrompt;
@@ -154,9 +156,9 @@ namespace UnAI.Agent
                             ToolCall = call
                         });
 
-                        float toolStart = Time.realtimeSinceStartup;
+                        float toolStart = (float)Stopwatch.GetTimestamp();
                         var result = await ExecuteToolAsync(call, token);
-                        float toolDuration = (Time.realtimeSinceStartup - toolStart) * 1000f;
+                        float toolDuration = (float)(Stopwatch.GetTimestamp() - toolStart) / Stopwatch.Frequency * 1000f;
 
                         toolResults.Add(result);
                         _conversation.AddToolResult(result.ToolCallId, result.ToolName, result.Content);
@@ -185,7 +187,7 @@ namespace UnAI.Agent
                     }
                 }
 
-                float stepDuration = (Time.realtimeSinceStartup - stepStart) * 1000f;
+                float stepDuration = (float)stepTimer.ElapsedMilliseconds;
                 bool noToolCalls = toolCalls == null || toolCalls.Count == 0;
                 bool isFinal = noToolCalls;
 

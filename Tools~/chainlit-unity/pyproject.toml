@@ -1,0 +1,17 @@
+[project]
+name = "chainlit-unity"
+version = "0.1.0"
+description = "Chainlit app for UnAI Agent with MCP support"
+requires-python = ">=3.13"
+dependencies = [
+    "chainlit>=2.10.1",
+    "aiohttp>=3.9.0",
+    "toml>=0.10.2",
+    "pex>=2.91.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0.0",
+    "ruff>=0.2.0",
+]
