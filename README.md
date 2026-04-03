@@ -477,6 +477,10 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
+## MCPInspector
+
+npx @modelcontextprotocol/inspector
+
 ## License
 
 MIT - see [LICENSE](LICENSE). Use it however you want, just keep the copyright notice.

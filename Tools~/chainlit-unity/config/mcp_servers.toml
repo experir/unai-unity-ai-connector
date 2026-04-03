@@ -1,0 +1,34 @@
+# MCP Servers Configuration
+# 配置多个MCP服务器连接
+
+# Unity MCP Server (提供Unity工具)
+[[mcp_servers]]
+name = "unity"
+type = "streamable-http"
+url = "http://localhost:8080/mcp"
+enabled = true
+
+# 文件系统MCP (示例)
+# [[mcp_servers]]
+# name = "filesystem"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/filesystem", "/path/to/workspace"]
+# enabled = true
+
+# GitHub MCP (示例)
+# [[mcp_servers]]
+# name = "github"
+# type = "streamable-http"
+# url = "https://api.github.com/mcp"
+# enabled = true
+
+[unity]
+# Unity Agent HTTP Server 配置
+url = "http://localhost:17997"
+api_key = "unai-default-key"
+
+[openai]
+# OpenAI API 配置
+model = "gpt-4o"
+api_key = ""  # 请设置环境变量 OPENAI_API_KEY

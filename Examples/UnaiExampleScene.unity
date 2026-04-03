@@ -149,7 +149,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2aa3c48c8a9fd774283b7283b02dfebd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnAI.Examples::UnAI.Examples.UnaiExampleChat
-  _config: {fileID: 0}
   _providerDropdown: {fileID: 1530868011}
   _systemPromptInput: {fileID: 1624765648}
   _userMessageInput: {fileID: 1982342463}
@@ -178,7 +177,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5656894171e8cd42b9b9c56726926d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnAI.Runtime::UnAI.Core.UnaiManager
-  _config: {fileID: 0}
+  _config: {fileID: 11400000, guid: 8d3735bdbfb735149aae5e40a2ba755f, type: 2}
   _activeProviderId: 
 --- !u!4 &8332260
 Transform:
@@ -687,6 +686,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 19944853}
   m_CullTransparentMesh: 1
+--- !u!1 &56685102
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 56685104}
+  - component: {fileID: 56685103}
+  m_Layer: 0
+  m_Name: HttpServer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &56685103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 56685102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f641d6344aaa16c48abf8726a3cd6385, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnAI.Agent::UnAI.Agent.Http.UnaiAgentHttpServer
+  Port: 17997
+  ApiKey: unai-default-key
+--- !u!4 &56685104
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 56685102}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: 0, z: -0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &76654523
 GameObject:
   m_ObjectHideFlags: 0
@@ -1167,7 +1212,6 @@ MonoBehaviour:
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
-  m_Version: 2
   m_TaaSettings:
     m_Quality: 3
     m_FrameInfluence: 0.1
@@ -1175,6 +1219,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &248324123
 GameObject:
   m_ObjectHideFlags: 0
@@ -1430,7 +1475,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
+  m_VertexColorAlwaysGammaSpace: 1
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -6104,3 +6149,4 @@ SceneRoots:
   - {fileID: 349082422}
   - {fileID: 295103886}
   - {fileID: 8332260}
+  - {fileID: 56685104}

@@ -15,7 +15,8 @@ namespace UnAI.MCP
         public const string ServerName = "unai-unity";
         public static string ServerVersion => UnaiVersion.Get();
 
-        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, CancellationToken ct)
+        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, 
+            UnaiMcpTransport transport, string clientId, CancellationToken ct)
         {
             JObject request;
             try
@@ -49,7 +50,7 @@ namespace UnAI.MCP
                     "initialize" => HandleInitialize(id),
                     "ping" => MakeResult(id, new JObject()),
                     "tools/list" => HandleToolsList(id, tools),
-                    "tools/call" => await HandleToolsCall(id, parameters, tools, ct),
+                    "tools/call" => await HandleToolsCall(id, parameters, tools, transport, clientId, ct),
                     _ => MakeError(id, -32601, $"Method not found: {method}")
                 };
             }
@@ -123,7 +124,7 @@ namespace UnAI.MCP
         }
 
         private static async Task<string> HandleToolsCall(JToken id, JObject parameters,
-            UnaiToolRegistry tools, CancellationToken ct)
+            UnaiToolRegistry tools, UnaiMcpTransport transport, string clientId, CancellationToken ct)
         {
             string toolName = parameters["name"]?.ToString();
             if (string.IsNullOrEmpty(toolName))
@@ -144,7 +145,31 @@ namespace UnAI.MCP
 
             Debug.Log($"[UNAI MCP] Calling tool '{toolName}' with args: {call.ArgumentsJson}");
 
+            // Send progress notification to the specific client only
+            if (transport != null && !string.IsNullOrEmpty(clientId))
+            {
+                await transport.SendToClient(clientId, "notifications/progress", new
+                {
+                    progressToken = id?.ToString(),
+                    progress = 0,
+                    total = 1,
+                    message = $"Running {toolName}..."
+                });
+            }
+            
             var toolResult = await tool.ExecuteAsync(call, ct);
+            
+            // Send completion notification to the specific client only
+            if (transport != null && !string.IsNullOrEmpty(clientId))
+            {
+                await transport.SendToClient(clientId, "notifications/progress", new
+                {
+                    progressToken = id?.ToString(),
+                    progress = 1,
+                    total = 1,
+                    message = "Done"
+                });
+            }
 
             var contentArray = new JArray
             {
