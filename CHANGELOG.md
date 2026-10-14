@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Explicit MCP client probes and opt-in live-provider validation tooling with sanitized reports
 - Reproducible module/sample validation projects and GitHub metadata, Unity test and player build workflows
 - Account/server model discovery, editor model selection and provider capability controls
 - Optional UPM samples, including minimal runtime chat without UI or Agent dependencies

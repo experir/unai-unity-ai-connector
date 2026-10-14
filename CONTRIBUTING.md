@@ -82,6 +82,8 @@ Before a release, verify a clean UPM installation, optional-module removal with 
 
 Run `python Tools~/validate_package.py` for package versions, metadata, sample paths and local documentation links.
 
+For real client/provider checks, use the explicit [live integration workflow](Docs/live-validation.md). Cloud calls are opt-in and consume credits; the normal regression suite stays offline.
+
 Create an isolated Unity project with `python Tools~/prepare_unity_project.py PATH_TO_NEW_PROJECT --modules full --samples`. Open it in Unity 6 and run the `UnAI.Tests.Editor` tests in Test Runner. Omit `--samples` to verify the package without imported examples. `--modules core`, `agent`, `assistant` or `mcp` validates the corresponding module combination; only the full project includes tests that depend on all optional modules.
 
 For headless testing, use Unity's `-batchmode -nographics -projectPath PATH -runTests -testPlatform EditMode -testResults results.xml -logFile tests.log` options. For player validation, add `-quit -executeMethod UnaiValidationBuild.Build` and choose `-buildTarget StandaloneWindows64` or `WebGL`. The generated build helper creates a scene with `UnaiManager` and does not call a cloud provider.

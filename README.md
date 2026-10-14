@@ -378,7 +378,7 @@ Use the URL shown in the server window. For Claude Code, HTTP registration uses:
 claude mcp add --transport http unity http://localhost:3389/mcp --header "Authorization: Bearer <token>"
 ```
 
-See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. Protocol exchanges have been tested with .NET HTTP and UnityWebRequest fixtures; the Claude Code UI itself has not been tested. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. Claude Code's HTTP health check, MCP Inspector tool calls and official SDK integration probes have passed locally; see [tested clients and reproduction steps](Docs/live-validation.md#mcp-clients). GUI client sessions remain unverified. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
 
 ### How it works
 
@@ -476,6 +476,7 @@ Documentation lives in this repository and is versioned with the package.
 | [Troubleshooting](Docs/troubleshooting.md) | Common errors, platform notes and diagnostics |
 | [Maintenance review](Docs/maintenance-review.md) | Prioritized findings and proposed refresh work |
 | [Refresh validation](Docs/validation.md) | Tested Unity version, regression coverage, builds and remaining verification |
+| [Live integration checks](Docs/live-validation.md) | Tested MCP clients and an explicit local/cloud provider runner |
 
 ## Contributing
 

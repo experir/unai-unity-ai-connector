@@ -28,6 +28,8 @@ Environment variables are useful for development and trusted server processes. T
 
 ## Local models
 
+Live checks on 2026-10-14 passed with Ollama 0.17.1 and `qwen3:0.6b` on Unity 6000.3.23f1/Windows: discovery, chat, streaming/usage, tool history and cancellation. Tool-bearing `ChatStreamAsync` requests use a buffered non-streaming transport in this adapter. This verifies that specific local model/server combination; cloud account availability remains untested. See [live integration checks](live-validation.md).
+
 1. Start your local model server and load or download a model.
 2. Enable its provider in the config and set `DefaultModel` to the loaded model's ID. LM Studio and llama.cpp default to an empty model field.
 3. Set `DefaultProviderId` to `ollama`, `lmstudio`, or `llamacpp`.

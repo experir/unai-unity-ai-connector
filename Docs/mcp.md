@@ -19,7 +19,7 @@ claude mcp add --transport http unity http://localhost:3389/mcp --header "Author
 claude mcp get unity
 ```
 
-Use `/mcp` inside Claude Code to inspect connection status. This is client configuration guidance, not a claim that this UNAI revision has passed an end-to-end client compatibility test. See the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+Use `/mcp` inside Claude Code to inspect connection status. Claude Code 2.1.34's HTTP health check passed locally; MCP Inspector 2.11.0 called a built-in Unity tool, and official SDK 1.32.1 probes passed permissions, cancellation and reload/reconnection checks. No Claude model session was invoked. See [reproduction steps](live-validation.md#mcp-clients) and the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
 
 For other clients, use their local HTTP server configuration with the URL shown in Unity. Their JSON settings formats differ. The old Claude Desktop example containing only a `url` in its developer config has been removed; do not assume that config accepts HTTP servers. Clients that support only stdio need a separate bridge, which UNAI does not include.
 
@@ -41,7 +41,7 @@ Client cancellation is scoped to its session through `notifications/cancelled` a
 
 Origin validation and bearer authentication run before dispatch. Native local clients may omit Origin, but still need the token; browsers must use the exact server origin. CORS is restricted. The server binds to `localhost` and rejects non-loopback peers. Custom tools are not exposed as read-only unless explicitly marked.
 
-Unity tests exercise initialize/list/call/cancel exchanges with .NET HTTP and UnityWebRequest clients, including version negotiation, notification status, authorization, deadlines and request-size limits. Claude Code/Desktop and Cursor UI sessions have not been tested. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [maintenance review](maintenance-review.md).
+Unity tests exercise initialize/list/call/cancel exchanges with .NET HTTP and UnityWebRequest clients, including version negotiation, notification status, authorization, deadlines and request-size limits. Independent CLI clients were also exercised as described above; Claude Code/Desktop and Cursor GUI sessions remain unverified. The server supports the two documented 2025 protocol revisions, not the 2026 revision. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [maintenance review](maintenance-review.md).
 
 ## Troubleshooting
 
