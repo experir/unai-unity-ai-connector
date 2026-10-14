@@ -1,0 +1,10 @@
+{
+    "name": "UnAI.Tests.Editor",
+    "references": ["UnAI.Runtime", "UnAI.Agent", "UnAI.MCP"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "overrideReferences": true,
+    "precompiledReferences": ["Newtonsoft.Json.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

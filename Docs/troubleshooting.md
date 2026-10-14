@@ -18,7 +18,7 @@ The HTTP layer starts Unity coroutines. Invoke requests from Unity's main thread
 | Invalid model / 400 | Enter a model ID available to your account and start with no optional request settings |
 | 404 on an OpenAI-compatible server | The adapter appends `/v1/chat/completions`; avoid duplicating `/v1` in `BaseUrl` |
 | 429 | Check provider limits; retryable requests use backoff and optional configured fallback |
-| Garbled accents or emoji while streaming | The current streaming handler casts UTF-8 bytes to chars; use non-streaming while the decoder fix is pending |
+| Garbled accents or emoji while streaming | The streaming handler decodes UTF-8 incrementally; inspect server encoding and report a sanitized reproduction if text is still corrupted |
 | Streaming never finishes | Streaming currently ignores `TimeoutSeconds`; pass a cancellation token with a deadline |
 | JSON response does not match your schema | Enforcement differs by adapter; validate the result in your application |
 

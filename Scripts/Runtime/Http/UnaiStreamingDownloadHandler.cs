@@ -7,6 +7,8 @@ namespace UnAI.Http
     public class UnaiStreamingDownloadHandler : DownloadHandlerScript
     {
         private readonly StringBuilder _lineBuffer = new(512);
+        private readonly Decoder _decoder = new UTF8Encoding(false, true).GetDecoder();
+        private readonly char[] _characters = new char[4097];
         private readonly Action<string> _onLineReceived;
         private readonly Action _onComplete;
         private bool _isComplete;
@@ -26,10 +28,24 @@ namespace UnAI.Http
         {
             if (_isComplete) return false;
 
-            for (int i = 0; i < dataLength; i++)
+            if (data == null || dataLength == 0) return true;
+            int offset = 0;
+            while (offset < dataLength)
             {
-                char c = (char)data[i];
+                _decoder.Convert(data, offset, dataLength - offset,
+                    _characters, 0, _characters.Length, false,
+                    out int bytesUsed, out int charsUsed, out _);
+                offset += bytesUsed;
+                ProcessCharacters(charsUsed);
+            }
+            return true;
+        }
 
+        private void ProcessCharacters(int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                char c = _characters[i];
                 if (c == '\n')
                 {
                     if (_lineBuffer.Length > 0 && _lineBuffer[_lineBuffer.Length - 1] == '\r')
@@ -45,12 +61,13 @@ namespace UnAI.Http
                 }
             }
 
-            return true;
         }
 
         protected override void CompleteContent()
         {
             _isComplete = true;
+            int count = _decoder.GetChars(Array.Empty<byte>(), 0, 0, _characters, 0, true);
+            ProcessCharacters(count);
 
             if (_lineBuffer.Length > 0)
             {

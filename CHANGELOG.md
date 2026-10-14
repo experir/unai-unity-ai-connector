@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarified API key handling for distributed builds, cancellation, raw logging and platform verification
 - Updated contribution setup and validation instructions
 
+### Fixed
+- Streaming UTF-8 decoding preserves split accented characters, CJK and emoji
+
 ## [1.0.0] - 2026-02-06
 
 ### Added

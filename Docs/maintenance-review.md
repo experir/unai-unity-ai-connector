@@ -18,6 +18,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 2. Decode streaming content as incremental UTF-8
 
+**Implemented and verified:** a persistent strict UTF-8 decoder handles split characters and final flush. Three Unity EditMode regression tests pass.
+
 **Evidence:** [UnaiStreamingDownloadHandler.cs](../Scripts/Runtime/Http/UnaiStreamingDownloadHandler.cs), `ReceiveData`, uses `char c = (char)data[i]`.
 
 **Impact:** non-ASCII text such as `café`, CJK characters and emoji becomes corrupted; network chunks can split a single UTF-8 character.
