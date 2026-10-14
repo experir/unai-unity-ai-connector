@@ -110,17 +110,13 @@ namespace UnAI.MCP
 
                 EditorGUILayout.Space(8);
 
-                EditorGUILayout.LabelField("Claude Desktop Config:", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("HTTP MCP Client Setup:", EditorStyles.boldLabel);
                 EditorGUILayout.HelpBox(
-                    "Add this to your Claude Desktop config\n" +
-                    "(Settings > Developer > Edit Config):\n\n" +
-                    "{\n" +
-                    "  \"mcpServers\": {\n" +
-                    "    \"unity\": {\n" +
-                    $"      \"url\": \"{_server.Url}\"\n" +
-                    "    }\n" +
-                    "  }\n" +
-                    "}",
+                    "Configure a client that supports local HTTP MCP servers.\n\n" +
+                    "Claude Code registration:\n" +
+                    $"claude mcp add --transport http unity {_server.Url}\n\n" +
+                    "Client formats differ. See Docs/mcp.md for setup and " +
+                    "current protocol limitations; compatibility must be verified with your client.",
                     MessageType.Info);
 
                 if (GUILayout.Button("Copy URL to Clipboard"))

@@ -5,6 +5,20 @@ All notable changes to UNAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Repository guides for provider configuration, MCP setup and troubleshooting
+- Source-based maintenance review with prioritized fixes and verification criteria
+- README logo in a rounded dark square for visibility on light and dark themes
+
+### Changed
+- Replaced retired website documentation links with repository links
+- Corrected JSON dependency version, module requirements, tool registration and provider capability claims
+- Replaced the old Claude Desktop config example with HTTP client guidance and documented MCP limitations
+- Clarified API key handling for distributed builds, cancellation, raw logging and platform verification
+- Updated contribution setup and validation instructions
+
 ## [1.0.0] - 2026-02-06
 
 ### Added
