@@ -68,6 +68,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 6. Prevent provider keys from reaching diagnostics
 
+**Implemented:** Gemini uses the `x-goog-api-key` header. Central diagnostics redact credential query parameters, JSON secret fields and registered provider secrets, including failure text. The inspector reports key presence without leaking a prefix. Tests use sentinel values.
+
 **Evidence:** [GeminiProvider.cs](../Scripts/Runtime/Providers/Gemini/GeminiProvider.cs) puts the key in a URL query parameter. [UnaiLogger.cs](../Scripts/Runtime/Utilities/UnaiLogger.cs) writes that URL unchanged when raw JSON logging is enabled.
 
 **Impact:** enabling raw diagnostics can write a cloud API key to `Library/UnAI` logs.

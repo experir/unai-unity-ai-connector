@@ -64,6 +64,6 @@ Use a backend for shared cloud-provider secrets in distributed builds. On WebGL,
 
 Verbose logging is controlled by `DebugLogging`. Raw JSON logging is a separate opt-in setting (`UnaiLogger.RawJsonLoggingEnabled`) and writes to `Library/UnAI` relative to the project.
 
-Raw logs contain prompts and responses. The current Gemini adapter puts its API key in the request URL, which raw logging records. Keep raw logging disabled unless needed, and redact keys, private prompts, personal data and tool arguments before sharing logs.
+Raw logs contain prompts and responses. Gemini authentication uses a header; diagnostics redact credential query fields, secret JSON properties and registered provider keys. Keep raw logging disabled unless needed, and redact keys, private prompts, personal data and tool arguments before sharing logs.
 
 For bug reports, include Unity version, OS or build target, provider and model ID, streaming/non-streaming mode, reproduction steps, and sanitized errors. For MCP, include the client version and transport. See [CONTRIBUTING.md](../CONTRIBUTING.md).

@@ -26,20 +26,20 @@ namespace UnAI.Providers.Gemini
         protected override string BuildRequestUrl(UnaiChatRequest request)
         {
             string baseUrl = Config.BaseUrl.TrimEnd('/');
-            string apiKey = Config.ResolvedApiKey;
-            string model = request.Model;
+            string model = System.Uri.EscapeDataString(request.Model);
 
             if (request.Stream)
-                return $"{baseUrl}/v1beta/models/{model}:streamGenerateContent?alt=sse&key={apiKey}";
+                return $"{baseUrl}/v1beta/models/{model}:streamGenerateContent?alt=sse";
             else
-                return $"{baseUrl}/v1beta/models/{model}:generateContent?key={apiKey}";
+                return $"{baseUrl}/v1beta/models/{model}:generateContent";
         }
 
         protected override Dictionary<string, string> BuildHeaders()
         {
             return new Dictionary<string, string>
             {
-                ["Content-Type"] = "application/json"
+                ["Content-Type"] = "application/json",
+                ["x-goog-api-key"] = Config.ResolvedApiKey
             };
         }
 

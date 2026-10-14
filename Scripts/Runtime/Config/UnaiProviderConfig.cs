@@ -32,8 +32,15 @@ namespace UnAI.Config
         [Tooltip("Custom headers to include with every request.")]
         public SerializableKeyValuePair[] CustomHeaders;
 
-        public string ResolvedApiKey =>
-            UnaiEnvironment.GetApiKey(ApiKeyEnvironmentVariable, ApiKey);
+        public string ResolvedApiKey
+        {
+            get
+            {
+                string key = UnaiEnvironment.GetApiKey(ApiKeyEnvironmentVariable, ApiKey);
+                UnAI.Utilities.UnaiLogger.RegisterSecret(key);
+                return key;
+            }
+        }
     }
 
     [System.Serializable]

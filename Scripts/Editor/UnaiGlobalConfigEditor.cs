@@ -53,7 +53,7 @@ namespace UnAI.Editor
                 foreach (var provider in config.AllProviders())
                 {
                     string resolved = provider.ResolvedApiKey;
-                    string masked = string.IsNullOrEmpty(resolved) ? "(empty)" : resolved[..System.Math.Min(8, resolved.Length)] + "...";
+                    string masked = string.IsNullOrEmpty(resolved) ? "(empty)" : "(configured)";
                     Debug.Log($"[UNAI] {provider.ProviderId}: {masked}");
                 }
             }

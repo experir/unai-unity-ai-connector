@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Gemini header authentication and central diagnostic credential redaction
 - Local MCP requires a bearer token, validates origins and exposes only read-only tools by default
 - Streaming timeouts, trailing usage, final-event flushing and task settlement in Editor and Play Mode
 - Automatic streaming retry/fallback stops after partial output to avoid replaying content or tools
