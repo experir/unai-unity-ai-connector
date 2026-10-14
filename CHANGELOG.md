@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Ollama retains token usage, finish reasons and tool-result names; malformed/error stream payloads fail visibly
 - Cancellation from a stream callback suppresses remaining buffered deltas and completion
 - UI sample uses the current TextMeshPro wrapping API without obsolete API warnings
 - Native Gemini call IDs and Anthropic streamed tools/signed content survive tool-history round trips

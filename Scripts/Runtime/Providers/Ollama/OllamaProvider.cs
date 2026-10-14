@@ -48,6 +48,8 @@ namespace UnAI.Providers.Ollama
                     ["role"] = msg.Role.ToString().ToLowerInvariant(),
                     ["content"] = msg.Content ?? ""
                 };
+                if (msg.Role == UnaiRole.Tool && !string.IsNullOrEmpty(msg.ToolName))
+                    msgObj["tool_name"] = msg.ToolName;
 
                 // Serialize assistant tool calls
                 if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
@@ -132,7 +134,8 @@ namespace UnAI.Providers.Ollama
                 Content = message?["content"]?.ToString() ?? "",
                 Role = UnaiRole.Assistant,
                 Model = root["model"]?.ToString(),
-                FinishReason = root["done"]?.Value<bool>() == true ? "stop" : null
+                FinishReason = root["done_reason"]?.ToString() ?? (root["done"]?.Value<bool>() == true ? "stop" : null),
+                Usage = ReadUsage(root)
             };
 
             // Parse native tool calls from Ollama response
@@ -164,6 +167,14 @@ namespace UnAI.Providers.Ollama
             }
 
             return response;
+        }
+
+        internal static UnaiUsageInfo ReadUsage(JObject root)
+        {
+            if (root["prompt_eval_count"] == null && root["eval_count"] == null) return null;
+            int prompt = root["prompt_eval_count"]?.Value<int>() ?? 0;
+            int completion = root["eval_count"]?.Value<int>() ?? 0;
+            return new UnaiUsageInfo { PromptTokens = prompt, CompletionTokens = completion, TotalTokens = prompt + completion };
         }
 
         /// <summary>
@@ -231,7 +242,8 @@ namespace UnAI.Providers.Ollama
                         IsFinal = true,
                         FinishReason = response.FinishReason ?? "stop",
                         EventType = "done",
-                        ToolCalls = response.ToolCalls
+                        ToolCalls = response.ToolCalls,
+                        Usage = response.Usage
                     });
 
                     onComplete?.Invoke(response);
@@ -270,6 +282,8 @@ namespace UnAI.Providers.Ollama
             try
             {
                 var root = JObject.Parse(line);
+                if (root["error"] != null)
+                    throw new FormatException("Ollama reported an error in the response stream.");
                 bool done = root["done"]?.Value<bool>() ?? false;
                 var message = root["message"];
                 string content = message?["content"]?.ToString() ?? "";
@@ -299,9 +313,10 @@ namespace UnAI.Providers.Ollama
                     Content = content,
                     AccumulatedContent = _accumulated.ToString(),
                     IsFinal = done,
-                    FinishReason = done ? "stop" : null,
+                    FinishReason = root["done_reason"]?.ToString() ?? (done ? "stop" : null),
                     EventType = done ? "done" : "delta",
-                    ToolCalls = _pendingToolCalls
+                    ToolCalls = _pendingToolCalls,
+                    Usage = OllamaProvider.ReadUsage(root)
                 };
 
                 if (done)
@@ -311,8 +326,7 @@ namespace UnAI.Providers.Ollama
             }
             catch (System.Exception ex)
             {
-                UnaiLogger.LogWarning($"[UNAI] Failed to parse Ollama NDJSON line: {ex.Message}");
-                return null;
+                throw new FormatException("Could not process the Ollama response stream.", ex);
             }
         }
 

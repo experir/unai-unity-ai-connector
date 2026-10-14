@@ -56,6 +56,37 @@ namespace UnAI.Tests
         }
 
         [Test]
+        public void OllamaPreservesUsageFinishReasonAndToolResultName()
+        {
+            var provider = Provider("ollama");
+            var request = new UnaiChatRequest { Model = "fixture", Messages = new()
+            {
+                UnaiChatMessage.ToolResult("call-1", "weather", "sunny")
+            }};
+            Assert.AreEqual("weather", Payload(provider, request)["messages"][0]["tool_name"].ToString());
+            var response = (UnaiChatResponse)Call(provider, "DeserializeResponse",
+                "{\"message\":{\"content\":\"partial\"},\"done\":true,\"done_reason\":\"length\",\"prompt_eval_count\":5,\"eval_count\":7}");
+            Assert.AreEqual("length", response.FinishReason);
+            Assert.AreEqual(5, response.Usage.PromptTokens);
+            Assert.AreEqual(7, response.Usage.CompletionTokens);
+            Assert.AreEqual(12, response.Usage.TotalTokens);
+            var parser = (ISseLineParser)Call(provider, "CreateStreamParser");
+            parser.ProcessLine("{\"message\":{\"content\":\"partial\"},\"done\":false}");
+            var final = parser.ProcessLine("{\"done\":true,\"done_reason\":\"length\",\"prompt_eval_count\":5,\"eval_count\":7}");
+            Assert.AreEqual("partial", final.AccumulatedContent);
+            Assert.AreEqual("length", final.FinishReason);
+            Assert.AreEqual(12, final.Usage.TotalTokens);
+        }
+
+        [TestCase("not-json")]
+        [TestCase("{\"error\":\"model failed\"}")]
+        public void OllamaStreamFailuresDoNotAppearToCompleteSuccessfully(string line)
+        {
+            var parser = (ISseLineParser)Call(Provider("ollama"), "CreateStreamParser");
+            Assert.Throws<FormatException>(() => parser.ProcessLine(line));
+        }
+
+        [Test]
         public void OpenAiUsesCompletionLimitWithoutChangingCompatibleServers()
         {
             var request = new UnaiChatRequest { Model = "gpt-5.2", Messages = new() { UnaiChatMessage.User("hello") },
