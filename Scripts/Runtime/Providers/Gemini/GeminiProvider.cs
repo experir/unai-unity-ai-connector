@@ -61,16 +61,21 @@ namespace UnAI.Providers.Gemini
 
                 if (msg.Role == UnaiRole.Tool)
                 {
+                    var functionResponse = new JObject
+                    {
+                        ["name"] = msg.ToolName,
+                        ["response"] = new JObject { ["result"] = msg.Content }
+                    };
+                    var matchingCall = request.Messages.Where(m => m.ToolCalls != null)
+                        .SelectMany(m => m.ToolCalls).LastOrDefault(call => call.Id == msg.ToolCallId);
+                    if (matchingCall?.ProviderMetadata?["geminiCallId"] is JToken nativeId && nativeId.Type != JTokenType.Null)
+                        functionResponse["id"] = nativeId.DeepClone();
                     contents.Add(new JObject
                     {
                         ["role"] = "user",
                         ["parts"] = new JArray(new JObject
                         {
-                            ["functionResponse"] = new JObject
-                            {
-                                ["name"] = msg.ToolName,
-                                ["response"] = new JObject { ["result"] = msg.Content }
-                            }
+                            ["functionResponse"] = functionResponse
                         })
                     });
                     continue;
@@ -184,16 +189,17 @@ namespace UnAI.Providers.Gemini
                         toolCalls ??= new List<UnaiToolCall>();
                         toolCalls.Add(new UnaiToolCall
                         {
-                            Id = $"gemini_{System.Guid.NewGuid():N}".Substring(0, 16),
+                            Id = fc["id"]?.ToString() ?? $"gemini_{System.Guid.NewGuid():N}".Substring(0, 16),
                             ToolName = fc["name"]?.ToString(),
-                            ArgumentsJson = fc["args"]?.ToString(Formatting.None) ?? "{}"
+                            ArgumentsJson = fc["args"]?.ToString(Formatting.None) ?? "{}",
+                            ProviderMetadata = new JObject { ["geminiCallId"] = fc["id"]?.DeepClone() }
                         });
                     }
                 }
             }
 
             if (toolCalls is { Count: > 0 })
-                toolCalls[0].ProviderMetadata = new JObject { ["geminiParts"] = parts.DeepClone() };
+                toolCalls[0].ProviderMetadata["geminiParts"] = parts.DeepClone();
 
             return new UnaiChatResponse
             {
@@ -231,7 +237,7 @@ namespace UnAI.Providers.Gemini
                     var response = DeserializeResponse(jsonData);
                     if (response.ToolCalls != null) toolCalls.AddRange(response.ToolCalls);
                     if (toolCalls.Count > 0)
-                        toolCalls[0].ProviderMetadata = new JObject { ["geminiParts"] = originalParts.DeepClone() };
+                        toolCalls[0].ProviderMetadata["geminiParts"] = originalParts.DeepClone();
 
                     return new UnaiStreamDelta
                     {

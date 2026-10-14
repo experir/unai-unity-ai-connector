@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Native Gemini call IDs and Anthropic streamed tools/signed content survive tool-history round trips
 - UPM version lookup, provider reinitialization and static state with domain/scene reload disabled
 - MCP version negotiation, sessions, 202 acknowledgements, request limits and cancellation/shutdown handling
 - OpenAI completion limits, compatible endpoint normalization and optional streaming usage

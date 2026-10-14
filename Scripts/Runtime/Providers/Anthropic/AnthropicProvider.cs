@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnAI.Core;
@@ -99,6 +100,11 @@ namespace UnAI.Providers.Anthropic
                 }
                 else if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
                 {
+                    if (msg.ToolCalls[0].ProviderMetadata?["anthropicContent"] is JArray original)
+                    {
+                        messages.Add(new JObject { ["role"] = "assistant", ["content"] = original.DeepClone() });
+                        continue;
+                    }
                     var contentBlocks = new JArray();
                     if (!string.IsNullOrEmpty(msg.Content))
                         contentBlocks.Add(new JObject { ["type"] = "text", ["text"] = msg.Content });
@@ -172,6 +178,9 @@ namespace UnAI.Providers.Anthropic
                 }
             }
 
+            if (toolCalls is { Count: > 0 })
+                toolCalls[0].ProviderMetadata = new JObject { ["anthropicContent"] = root["content"].DeepClone() };
+
             int inputTokens = root["usage"]?["input_tokens"]?.Value<int>() ?? 0;
             int outputTokens = root["usage"]?["output_tokens"]?.Value<int>() ?? 0;
 
@@ -193,64 +202,77 @@ namespace UnAI.Providers.Anthropic
 
         protected override ISseLineParser CreateStreamParser()
         {
-            // Accumulate usage across streaming events:
-            // message_start has input_tokens, message_delta has output_tokens
-            int inputTokens = 0;
-            int outputTokens = 0;
+            int inputTokens = 0, outputTokens = 0;
+            string finishReason = null;
+            var blocks = new SortedDictionary<int, JObject>();
+            var arguments = new Dictionary<int, System.Text.StringBuilder>();
 
-            return new SseLineParser(
-                deltaFactory: (eventType, jsonData) =>
+            UnaiStreamDelta Snapshot(bool final)
+            {
+                var snapshot = new JObject
                 {
-                    var root = JObject.Parse(jsonData);
-                    string type = root["type"]?.ToString();
+                    ["content"] = new JArray(blocks.Values.Select(block => block.DeepClone())),
+                    ["usage"] = new JObject { ["input_tokens"] = inputTokens, ["output_tokens"] = outputTokens }
+                };
+                var response = DeserializeResponse(snapshot.ToString(Formatting.None));
+                return new UnaiStreamDelta
+                {
+                    Content = "", IsFinal = final, FinishReason = finishReason,
+                    ToolCalls = response.ToolCalls, Usage = response.Usage
+                };
+            }
 
-                    switch (type)
-                    {
-                        case "message_start":
+            return new SseLineParser((eventType, jsonData) =>
+            {
+                var root = JObject.Parse(jsonData);
+                string type = root["type"]?.ToString();
+                int index = root["index"]?.Value<int>() ?? 0;
+                switch (type)
+                {
+                    case "message_start":
+                        inputTokens = root["message"]?["usage"]?["input_tokens"]?.Value<int>() ?? 0;
+                        return null;
+                    case "content_block_start":
+                        blocks[index] = (JObject)root["content_block"].DeepClone();
+                        return null;
+                    case "content_block_delta":
+                        if (!blocks.TryGetValue(index, out var block))
+                            throw new FormatException("Anthropic delta references a missing content block.");
+                        var delta = root["delta"];
+                        switch (delta?["type"]?.ToString())
                         {
-                            var msgUsage = root["message"]?["usage"];
-                            if (msgUsage != null)
-                                inputTokens = msgUsage["input_tokens"]?.Value<int>() ?? 0;
-                            return null;
+                            case "text_delta":
+                                string text = delta["text"]?.ToString() ?? "";
+                                block["text"] = (block["text"]?.ToString() ?? "") + text;
+                                return new UnaiStreamDelta { Content = text };
+                            case "input_json_delta":
+                                if (!arguments.TryGetValue(index, out var json)) arguments[index] = json = new System.Text.StringBuilder();
+                                json.Append(delta["partial_json"]?.ToString());
+                                return null;
+                            case "thinking_delta":
+                                block["thinking"] = (block["thinking"]?.ToString() ?? "") + delta["thinking"]?.ToString();
+                                return null;
+                            case "signature_delta":
+                                block["signature"] = (block["signature"]?.ToString() ?? "") + delta["signature"]?.ToString();
+                                return null;
                         }
-                        case "content_block_delta":
-                            return new UnaiStreamDelta
-                            {
-                                Content = root["delta"]?["text"]?.ToString() ?? "",
-                                EventType = type
-                            };
-                        case "message_delta":
-                        {
-                            var deltaUsage = root["usage"];
-                            if (deltaUsage != null)
-                                outputTokens = deltaUsage["output_tokens"]?.Value<int>() ?? 0;
-
-                            return new UnaiStreamDelta
-                            {
-                                Content = "",
-                                IsFinal = true,
-                                FinishReason = root["delta"]?["stop_reason"]?.ToString(),
-                                EventType = type,
-                                Usage = new UnaiUsageInfo
-                                {
-                                    PromptTokens = inputTokens,
-                                    CompletionTokens = outputTokens,
-                                    TotalTokens = inputTokens + outputTokens
-                                }
-                            };
-                        }
-                        case "message_stop":
-                            return new UnaiStreamDelta
-                            {
-                                Content = "",
-                                IsFinal = true,
-                                EventType = type
-                            };
-                        default:
-                            return null;
-                    }
-                },
-                doneMarker: "__ANTHROPIC_NO_DONE__");
+                        return null;
+                    case "content_block_stop":
+                        if (arguments.TryGetValue(index, out var input) && input.Length > 0)
+                            blocks[index]["input"] = JObject.Parse(input.ToString());
+                        return null;
+                    case "message_delta":
+                        finishReason = root["delta"]?["stop_reason"]?.ToString();
+                        outputTokens = root["usage"]?["output_tokens"]?.Value<int>() ?? outputTokens;
+                        return Snapshot(false);
+                    case "message_stop":
+                        return Snapshot(true);
+                    case "error":
+                        throw new InvalidOperationException("Anthropic returned a streaming error.");
+                    default:
+                        return null;
+                }
+            }, doneMarker: "__ANTHROPIC_NO_DONE__");
         }
 
         protected override bool ValidateConfig()

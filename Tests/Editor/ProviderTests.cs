@@ -12,6 +12,7 @@ using UnAI.Config;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Tools;
+using UnAI.Streaming;
 using UnityEngine.TestTools;
 
 namespace UnAI.Tests
@@ -90,12 +91,56 @@ namespace UnAI.Tests
         {
             var p = Provider("gemini");
             var response = (UnaiChatResponse)Call(p, "DeserializeResponse",
-                "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"summary\",\"thoughtSignature\":\"signature-1\"},{\"functionCall\":{\"name\":\"weather\",\"args\":{\"city\":\"Rome\"}},\"thoughtSignature\":\"signature-2\"}]},\"finishReason\":\"STOP\"}]}");
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"summary\",\"thoughtSignature\":\"signature-1\"},{\"functionCall\":{\"id\":\"native-call-1\",\"name\":\"weather\",\"args\":{\"city\":\"Rome\"}},\"thoughtSignature\":\"signature-2\"}]},\"finishReason\":\"STOP\"}]}");
             Assert.AreEqual("", response.Content);
             var request = new UnaiChatRequest { Messages = new() { UnaiChatMessage.AssistantWithToolCalls(response.ToolCalls) } };
             var parts = Payload(p, request.Clone())["contents"][0]["parts"];
             Assert.AreEqual("signature-1", parts[0]["thoughtSignature"].ToString());
             Assert.AreEqual("signature-2", parts[1]["thoughtSignature"].ToString());
+            request.Messages.Add(UnaiChatMessage.ToolResult(response.ToolCalls[0].Id, "weather", "sunny"));
+            Assert.AreEqual("native-call-1", Payload(p, request)["contents"][1]["parts"][0]["functionResponse"]["id"].ToString());
+        }
+
+        [Test]
+        public void AnthropicSignedToolHistoryRoundTrips()
+        {
+            var p = Provider("anthropic");
+            var response = (UnaiChatResponse)Call(p, "DeserializeResponse",
+                "{\"content\":[{\"type\":\"thinking\",\"thinking\":\"fixture summary\",\"signature\":\"opaque-signature\"},{\"type\":\"tool_use\",\"id\":\"native-call-1\",\"name\":\"weather\",\"input\":{\"city\":\"Rome\"}}]}");
+            var request = new UnaiChatRequest { Messages = new() { UnaiChatMessage.AssistantWithToolCalls(response.ToolCalls) } };
+            Assert.AreEqual("", response.Content);
+            Assert.AreEqual("opaque-signature", Payload(p, request.Clone())["messages"][0]["content"][0]["signature"].ToString());
+        }
+
+        private static UnaiStreamDelta Event(ISseLineParser parser, string data)
+        {
+            parser.ProcessLine("data: " + data);
+            return parser.ProcessLine("");
+        }
+
+        [Test]
+        public void AnthropicStreamingAssemblesToolsThinkingAndUsage()
+        {
+            var p = Provider("anthropic");
+            var parser = (ISseLineParser)Call(p, "CreateStreamParser");
+            Event(parser, "{\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5}}}");
+            Event(parser, "{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}");
+            Event(parser, "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"fixture summary\"}}");
+            Event(parser, "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"opaque-signature\"}}");
+            Event(parser, "{\"type\":\"content_block_stop\",\"index\":0}");
+            Event(parser, "{\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"native-call-1\",\"name\":\"weather\",\"input\":{}}}");
+            Event(parser, "{\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"city\\\":\"}}");
+            Event(parser, "{\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"Rome\\\"}\"}}");
+            Event(parser, "{\"type\":\"content_block_stop\",\"index\":1}");
+            var usage = Event(parser, "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":7}}");
+            Assert.IsFalse(usage.IsFinal);
+            var final = Event(parser, "{\"type\":\"message_stop\"}");
+            Assert.IsTrue(final.IsFinal);
+            Assert.AreEqual(12, final.Usage.TotalTokens);
+            Assert.AreEqual("native-call-1", final.ToolCalls[0].Id);
+            Assert.AreEqual("Rome", final.ToolCalls[0].GetArguments()["city"].ToString());
+            var request = new UnaiChatRequest { Messages = new() { UnaiChatMessage.AssistantWithToolCalls(final.ToolCalls) } };
+            Assert.AreEqual("opaque-signature", Payload(p, request.Clone())["messages"][0]["content"][0]["signature"].ToString());
         }
 
         [Test]
