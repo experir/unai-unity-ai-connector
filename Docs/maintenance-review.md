@@ -30,6 +30,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 3. Keep provider model resolution separate from caller requests
 
+**Implemented:** independent request snapshots, provider validation and duplicate-free fallback. Explicit model IDs apply to the primary provider; backups use their configured defaults. Regression coverage exercises both APIs and preserves caller data.
+
 **Evidence:** [UnaiProviderBase.cs](../Scripts/Runtime/Core/UnaiProviderBase.cs), `ResolveModel`, writes the default into `request.Model`. [UnaiManager.cs](../Scripts/Runtime/Core/UnaiManager.cs) passes the same request through its fallback chain.
 
 **Impact:** an OpenAI request without a model resolves to the OpenAI default, then an Anthropic fallback receives that same model string instead of its own default. Reusing the request also retains earlier model and stream mutations.

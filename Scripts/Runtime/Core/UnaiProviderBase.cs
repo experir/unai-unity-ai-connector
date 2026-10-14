@@ -41,6 +41,9 @@ namespace UnAI.Core
             UnaiChatRequest request,
             CancellationToken cancellationToken = default)
         {
+            ValidateRequest(request);
+            cancellationToken.ThrowIfCancellationRequested();
+            request = request.Clone();
             request.Stream = false;
             ResolveModel(request);
 
@@ -72,6 +75,9 @@ namespace UnAI.Core
             Action<UnaiErrorInfo> onError = null,
             CancellationToken cancellationToken = default)
         {
+            ValidateRequest(request);
+            cancellationToken.ThrowIfCancellationRequested();
+            request = request.Clone();
             request.Stream = true;
             ResolveModel(request);
 
@@ -178,6 +184,15 @@ namespace UnAI.Core
         {
             if (string.IsNullOrEmpty(request.Model))
                 request.Model = Config.DefaultModel;
+        }
+
+        protected void ValidateRequest(UnaiChatRequest request)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (request.Messages == null || request.Messages.Count == 0)
+                throw new ArgumentException("At least one chat message is required.", nameof(request));
+            if (!IsConfigured || !Config.Enabled)
+                throw new InvalidOperationException($"Provider '{ProviderId}' is not configured or enabled. Check its base URL and API key.");
         }
     }
 }

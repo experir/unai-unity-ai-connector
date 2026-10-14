@@ -28,7 +28,8 @@ namespace UnAI.Core
         public UnaiResponseCache Cache { get; } = new();
 
         public IUnaiProvider ActiveProvider =>
-            UnaiProviderRegistry.Get(_activeProviderId ?? _config?.DefaultProviderId);
+            string.IsNullOrEmpty(_activeProviderId ?? _config?.DefaultProviderId)
+                ? null : UnaiProviderRegistry.Get(_activeProviderId ?? _config.DefaultProviderId);
 
         /// <summary>
         /// Fired when a request fails on one provider and is retried on a fallback.
@@ -41,7 +42,9 @@ namespace UnAI.Core
         /// </summary>
         public void Initialize(UnaiGlobalConfig config)
         {
+            if (config == null) throw new ArgumentNullException(nameof(config));
             _config = config;
+            Cache.Clear();
             UnaiLogger.VerboseEnabled = _config.DebugLogging;
             UnaiProviderRegistry.InitializeBuiltInProviders(_config);
             _activeProviderId = _config.DefaultProviderId;
@@ -76,7 +79,10 @@ namespace UnAI.Core
             UnaiChatRequest request,
             CancellationToken ct = default)
         {
-            var provider = ActiveProvider;
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            ct.ThrowIfCancellationRequested();
+            var provider = RequireActiveProvider();
+            request = request.Clone();
 
             // Cache check (before fallback — a cache hit skips everything)
             if (request.UseCache)
@@ -99,7 +105,8 @@ namespace UnAI.Core
 
                 try
                 {
-                    var response = await p.ChatAsync(request, ct);
+                    var attemptRequest = CreateProviderRequest(request, p, p != provider);
+                    var response = await p.ChatAsync(attemptRequest, ct);
 
                     if (request.UseCache)
                     {
@@ -136,7 +143,10 @@ namespace UnAI.Core
             Action<UnaiErrorInfo> onError = null,
             CancellationToken ct = default)
         {
-            var provider = ActiveProvider;
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            ct.ThrowIfCancellationRequested();
+            var provider = RequireActiveProvider();
+            request = request.Clone();
             var providersToTry = BuildProviderChain(provider);
 
             for (int i = 0; i < providersToTry.Count; i++)
@@ -147,7 +157,7 @@ namespace UnAI.Core
                 UnaiErrorInfo streamError = null;
 
                 await p.ChatStreamAsync(
-                    request, onDelta,
+                    CreateProviderRequest(request, p, i > 0), onDelta,
                     onComplete: response => onComplete?.Invoke(response),
                     onError: error =>
                     {
@@ -203,11 +213,28 @@ namespace UnAI.Core
                 if (string.IsNullOrEmpty(id)) continue;
                 if (id == primary.ProviderId) continue;
                 var fallback = UnaiProviderRegistry.Get(id);
-                if (fallback != null && fallback.IsConfigured)
+                if (fallback != null && fallback.IsConfigured && !chain.Contains(fallback))
                     chain.Add(fallback);
             }
 
             return chain;
+        }
+
+        private IUnaiProvider RequireActiveProvider()
+        {
+            var provider = ActiveProvider;
+            if (provider == null || !provider.IsConfigured)
+                throw new InvalidOperationException("UNAI has no configured active provider. Initialize UnaiManager with a config and enable its selected provider.");
+            return provider;
+        }
+
+        private UnaiChatRequest CreateProviderRequest(UnaiChatRequest request, IUnaiProvider provider, bool isFallback)
+        {
+            var copy = request.Clone();
+            // Explicit model IDs belong to the primary provider. Backups use their own defaults.
+            if (isFallback || string.IsNullOrEmpty(copy.Model))
+                copy.Model = _config?.GetProviderConfig(provider.ProviderId)?.DefaultModel;
+            return copy;
         }
 
         private void OnDestroy()

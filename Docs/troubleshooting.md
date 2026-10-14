@@ -46,7 +46,7 @@ catch (System.OperationCanceledException)
 }
 ```
 
-Create a separate request for each operation. Providers currently mutate `Model` and `Stream`; do not share one request between simultaneous calls.
+Each operation snapshots the request, including tools and messages. Providers resolve model and streaming state in that snapshot. Cross-provider backups use their own defaults.
 
 ## Platform expectations
 

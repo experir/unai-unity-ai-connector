@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Provider fallback uses independent request snapshots and each backup's default model
 - Streaming UTF-8 decoding preserves split accented characters, CJK and emoji
 
 ## [1.0.0] - 2026-02-06

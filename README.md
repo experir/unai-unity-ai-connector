@@ -251,7 +251,7 @@ await UnaiManager.Instance.ChatStreamAsync(
     ct: cts.Token);
 ```
 
-Catch `OperationCanceledException` in the caller. Use a separate request for each operation; providers currently mutate the request's model and streaming flag.
+Catch `OperationCanceledException` in the caller. Each operation snapshots its request; later provider resolution does not mutate the caller. Backups use their own default models.
 
 ## AI Agent System
 

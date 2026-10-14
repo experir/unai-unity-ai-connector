@@ -28,5 +28,20 @@ namespace UnAI.Models
         /// </summary>
         [JsonIgnore]
         public bool UseCache { get; set; }
+
+        /// <summary>Creates an independent snapshot, including tools and message metadata.</summary>
+        public UnaiChatRequest Clone()
+        {
+            var copy = JsonConvert.DeserializeObject<UnaiChatRequest>(JsonConvert.SerializeObject(this));
+            copy.Stream = Stream;
+            copy.UseCache = UseCache;
+            copy.Tools = Tools?.ConvertAll(tool => new UnaiToolDefinition
+            {
+                Name = tool.Name,
+                Description = tool.Description,
+                ParametersSchema = (Newtonsoft.Json.Linq.JObject)tool.ParametersSchema?.DeepClone()
+            });
+            return copy;
+        }
     }
 }
