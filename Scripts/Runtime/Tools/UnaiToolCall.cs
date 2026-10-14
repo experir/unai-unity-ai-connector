@@ -8,6 +8,8 @@ namespace UnAI.Tools
         public string Id { get; set; }
         public string ToolName { get; set; }
         public string ArgumentsJson { get; set; }
+        /// <summary>Provider-specific round-trip state, such as Gemini thought signatures.</summary>
+        public JObject ProviderMetadata { get; set; }
 
         public JObject GetArguments() => JObject.Parse(ArgumentsJson ?? "{}");
     }

@@ -25,13 +25,24 @@ namespace UnAI.Http
             return tcs.Task;
         }
 
+        public static Task<(string body, int statusCode, UnaiErrorInfo error)> GetAsync(
+            string url, Dictionary<string, string> headers, CancellationToken ct = default, int timeoutSeconds = 120)
+        {
+            var tcs = new TaskCompletionSource<(string, int, UnaiErrorInfo)>();
+            UnaiCoroutineRunner.Run(UnaiCoroutineRunner.Guard(
+                PostCoroutine(url, null, headers, ct, timeoutSeconds, tcs, "GET"),
+                ex => tcs.TrySetException(ex), () => tcs.TrySetCanceled()));
+            return tcs.Task;
+        }
+
         private static IEnumerator PostCoroutine(
             string url,
             string jsonBody,
             Dictionary<string, string> headers,
             CancellationToken cancellationToken,
             int timeoutSeconds,
-            TaskCompletionSource<(string, int, UnaiErrorInfo)> tcs)
+            TaskCompletionSource<(string, int, UnaiErrorInfo)> tcs,
+            string method = "POST")
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -40,11 +51,12 @@ namespace UnAI.Http
             }
             UnaiLogger.LogRawJson("REQUEST", url, jsonBody);
 
-            byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
-
-            using var request = new UnityWebRequest(url, "POST");
-            request.uploadHandler = new UploadHandlerRaw(bodyBytes);
-            request.uploadHandler.contentType = "application/json";
+            using var request = new UnityWebRequest(url, method);
+            if (jsonBody != null)
+            {
+                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(jsonBody));
+                request.uploadHandler.contentType = "application/json";
+            }
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = timeoutSeconds;
 

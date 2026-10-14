@@ -233,7 +233,8 @@ namespace UnAI.Core
                 Revision = UnaiProviderRegistry.Revision,
                 BaseUrl = config?.BaseUrl,
                 ApiKey = config?.ResolvedApiKey,
-                Headers = config?.CustomHeaders
+                Headers = config?.CustomHeaders,
+                Enabled = config?.Enabled, Tools = config?.EnableToolCalling, Schema = config?.EnableJsonSchema
             });
         }
 

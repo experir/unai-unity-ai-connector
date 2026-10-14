@@ -28,6 +28,12 @@ namespace UnAI.Config
 
         [Tooltip("Maximum retry attempts for retryable errors.")]
         public int MaxRetries = 3;
+        [Tooltip("Enable native tool payloads where implemented. Disable for servers/models without tool support.")]
+        public bool EnableToolCalling = true;
+        [Tooltip("Allow JSON Schema options. Disable when the selected server/model does not support them.")]
+        public bool EnableJsonSchema = true;
+        [Tooltip("Request streaming usage on OpenAI-compatible servers. OpenAI itself always requests usage.")]
+        public bool IncludeStreamingUsage;
 
         [Tooltip("Custom headers to include with every request.")]
         public SerializableKeyValuePair[] CustomHeaders;

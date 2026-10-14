@@ -31,7 +31,7 @@ namespace UnAI.Config
             ProviderId = "anthropic",
             BaseUrl = "https://api.anthropic.com",
             ApiKeyEnvironmentVariable = "ANTHROPIC_API_KEY",
-            DefaultModel = "claude-sonnet-4-5-20250929"
+            DefaultModel = "claude-sonnet-5-5"
         };
 
         public UnaiProviderConfig Gemini = new()
@@ -39,7 +39,7 @@ namespace UnAI.Config
             ProviderId = "gemini",
             BaseUrl = "https://generativelanguage.googleapis.com",
             ApiKeyEnvironmentVariable = "GEMINI_API_KEY",
-            DefaultModel = "gemini-2.5-flash"
+            DefaultModel = "gemini-3.8-flash"
         };
 
         public UnaiProviderConfig Mistral = new()

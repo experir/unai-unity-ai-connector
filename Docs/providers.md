@@ -6,7 +6,7 @@ Use **Window > UnAI > Hub > Core — Setup Wizard** to create a `UnaiGlobalConfi
 
 ## Endpoints and keys
 
-These are the defaults in the package, not a list of currently available models. Set `DefaultModel` to an ID available in your provider account or local server. The editor's model suggestions are hardcoded and may be outdated; you can enter a model ID manually.
+These are the defaults in the package, not a list of currently available models. Set `DefaultModel` to an ID available in your provider account or local server. The static model suggestions are a fallback. In the Editor Assistant, click **Models** to fetch the account/server catalog, select a returned ID, or enter an ID manually.
 
 | Provider | ID | Base URL | Key environment variable |
 |---|---|---|---|
@@ -20,7 +20,7 @@ These are the defaults in the package, not a list of currently available models.
 | llama.cpp | `llamacpp` | `http://localhost:8080` | None by default |
 | OpenAI-compatible | `openai-compatible` | Set your server URL | Configure as needed |
 
-OpenAI-compatible providers append `/v1/chat/completions` to `BaseUrl`. For example, use `http://localhost:1234`, rather than `http://localhost:1234/v1`. If your service's URL already ends in `/v1`, including it will produce a duplicated path with the current implementation. Check the actual endpoint path before configuring a custom service.
+OpenAI-compatible providers accept a host base URL or one ending in `/v1`; the adapter normalizes both to a single `/v1/chat/completions` path. Do not include `/chat/completions` in the base URL. Custom gateway paths still need to match your server.
 
 Key resolution checks the configured environment variable first, then the asset's `ApiKey` field. Restart Unity and, when relevant, Unity Hub after changing environment variables so the editor inherits them.
 
@@ -51,7 +51,7 @@ UNAI does not perform client-side JSON Schema validation. Validate returned cont
 
 `UnaiRequestOptions` exposes `Temperature`, `MaxTokens`, `TopP`, `StopSequences`, `ResponseFormat`, and schema fields. Support varies by provider and model. Start with no options, then add the settings your model accepts.
 
-The shared OpenAI-compatible serializer currently maps `MaxTokens` to `max_tokens`. OpenAI documents this parameter as deprecated in favor of `max_completion_tokens`, with model-specific restrictions. A dedicated OpenAI parameter update needs compatibility tests; see the [maintenance review](maintenance-review.md). [OpenAI Chat Completions reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+The OpenAI adapter maps `MaxTokens` to `max_completion_tokens`; generic compatible adapters keep `max_tokens`. Typed sampling options are rejected for reasoning model/effort combinations without supported sampling. Leave options unset unless your model accepts them. [OpenAI Chat Completions reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
 
 `ExtraParameters` is currently applied by the OpenAI-compatible serializer only. Do not assume an option is forwarded by every adapter.
 
@@ -62,3 +62,13 @@ The shared OpenAI-compatible serializer currently maps `MaxTokens` to `max_token
 Requests with `UseCache = true` opt into the manager's non-streaming response cache. Streaming responses are not cached.
 
 Fallback uses an independent request per provider. An explicit model ID applies to the primary provider only; backups use their own configured defaults. Cache identity includes the resolved model, full message/tool data, endpoint, credentials and registry revision. Cached responses are copied on insertion and retrieval.
+
+## Capability controls and model discovery
+
+Provider configs expose `EnableToolCalling`, `EnableJsonSchema` and `IncludeStreamingUsage`. Disable native tools or schema options for servers/models that do not support them. The agent uses text fallback when native tools are disabled. Generic compatible streaming usage is opt-in; OpenAI always requests usage. These controls describe adapter behavior and cannot prove a model supports a feature.
+
+`IUnaiModelProvider.ListModelsAsync()` fetches catalogs for OpenAI-compatible adapters (`/v1/models`), Anthropic (`/v1/models`), Gemini (`/v1beta/models`) and Ollama (`/api/tags`), handling pagination where provided. Cohere discovery is not implemented. Catalogs may contain models unsuitable for chat; choose one supported by the adapter endpoint. Discovery is an explicit user action and does not automatically overwrite a config. See the official [OpenAI model API](https://developers.openai.com/api/reference/resources/models/methods/list), [Anthropic model API](https://platform.claude.com/docs/en/api/models/list), and [Ollama model API](https://docs.ollama.com/api/tags).
+
+New config assets use `claude-sonnet-5-5` and `gemini-3.8-flash`, based on provider catalogs checked on 2026-10-14. Existing serialized config assets retain their chosen model IDs. OpenAI retains `gpt-5.2` as its default, with its documented 400,000-token context window. These are documentation-verified suggestions; live account availability has not been tested. [Claude models](https://platform.claude.com/docs/en/models/overview), [Gemini models](https://ai.google.dev/gemini-api/docs/models), [GPT-5.2](https://developers.openai.com/api/docs/models/gpt-5.2).
+
+Gemini tool history retains the original response parts and thought signatures, including streamed tool calls. Thought summaries are excluded from visible response text. See [Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking).

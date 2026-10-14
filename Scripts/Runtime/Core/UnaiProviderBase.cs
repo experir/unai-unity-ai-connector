@@ -7,15 +7,19 @@ using UnAI.Http;
 using UnAI.Models;
 using UnAI.Streaming;
 using UnAI.Utilities;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace UnAI.Core
 {
-    public abstract class UnaiProviderBase : IUnaiProvider
+    public abstract class UnaiProviderBase : IUnaiProvider, IUnaiModelProvider
     {
         public abstract string ProviderId { get; }
         public abstract string DisplayName { get; }
         public virtual IReadOnlyList<UnaiModelInfo> KnownModels => Array.Empty<UnaiModelInfo>();
         public virtual bool SupportsToolCalling => false;
+        protected virtual string ModelsEndpointPath => null;
+        public bool SupportsModelDiscovery => ModelsEndpointPath != null;
 
         protected UnaiProviderConfig Config { get; private set; }
 
@@ -36,6 +40,58 @@ namespace UnAI.Core
         protected abstract string SerializeRequest(UnaiChatRequest request);
         protected abstract UnaiChatResponse DeserializeResponse(string json);
         protected abstract ISseLineParser CreateStreamParser();
+
+        protected string BuildEndpointUrl(string path)
+        {
+            string baseUrl = Config.BaseUrl.TrimEnd('/');
+            if (baseUrl.EndsWith("/v1", StringComparison.Ordinal) && path.StartsWith("/v1/", StringComparison.Ordinal))
+                path = path.Substring(3);
+            return baseUrl + path;
+        }
+
+        public async Task<IReadOnlyList<UnaiModelInfo>> ListModelsAsync(CancellationToken ct = default)
+        {
+            if (!SupportsModelDiscovery) throw new NotSupportedException($"'{ProviderId}' does not implement model discovery.");
+            if (!IsConfigured) throw new InvalidOperationException($"Configure '{ProviderId}' before listing models.");
+            var result = new List<UnaiModelInfo>();
+            string url = BuildEndpointUrl(ModelsEndpointPath);
+            var visited = new HashSet<string>();
+            while (url != null)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!visited.Add(url) || visited.Count > 100) throw new FormatException("Model API exceeded pagination limits or repeated a cursor.");
+                var response = await UnaiRetryPolicy.ExecuteAsync(
+                    () => UnaiHttpClient.GetAsync(url, BuildHeaders(), ct, Config.TimeoutSeconds), Config.MaxRetries, ct);
+                if (response.error != null)
+                {
+                    response.error.ProviderId = ProviderId;
+                    throw new UnaiRequestException(response.error);
+                }
+                var root = JObject.Parse(response.body);
+                var entries = root["data"] as JArray ?? root["models"] as JArray
+                    ?? throw new FormatException("Model API response has no data/models array.");
+                foreach (var entry in entries)
+                {
+                    if (ProviderId == "gemini" && entry["supportedGenerationMethods"] is JArray methods
+                        && !methods.Any(m => m.ToString() == "generateContent")) continue;
+                    string id = entry["id"]?.ToString() ?? entry["model"]?.ToString() ?? entry["name"]?.ToString();
+                    if (string.IsNullOrEmpty(id)) continue;
+                    if (ProviderId == "gemini" && id.StartsWith("models/", StringComparison.Ordinal)) id = id.Substring(7);
+                    result.Add(new UnaiModelInfo
+                    {
+                        Id = id, DisplayName = entry["display_name"]?.ToString() ?? entry["displayName"]?.ToString() ?? id,
+                        ProviderId = ProviderId, MaxContextTokens = entry["inputTokenLimit"]?.Value<int>()
+                    });
+                }
+                string page = root["nextPageToken"]?.ToString();
+                string after = root["has_more"]?.Value<bool>() == true ? root["last_id"]?.ToString() : null;
+                if (root["has_more"]?.Value<bool>() == true && string.IsNullOrEmpty(after))
+                    throw new FormatException("Model API has more pages but no cursor.");
+                url = !string.IsNullOrEmpty(page) ? BuildEndpointUrl(ModelsEndpointPath) + "?pageToken=" + Uri.EscapeDataString(page)
+                    : !string.IsNullOrEmpty(after) ? BuildEndpointUrl(ModelsEndpointPath) + "?after_id=" + Uri.EscapeDataString(after) : null;
+            }
+            return result.GroupBy(m => m.Id, StringComparer.Ordinal).Select(group => group.First()).ToArray();
+        }
 
         public virtual async Task<UnaiChatResponse> ChatAsync(
             UnaiChatRequest request,
@@ -168,6 +224,13 @@ namespace UnAI.Core
                 throw new ArgumentException("At least one chat message is required.", nameof(request));
             if (!IsConfigured || !Config.Enabled)
                 throw new InvalidOperationException($"Provider '{ProviderId}' is not configured or enabled. Check its base URL and API key.");
+            if (request.Tools is { Count: > 0 } && !SupportsToolCalling)
+                throw new NotSupportedException($"'{ProviderId}' is configured without native tool calling.");
+            if (request.Options?.ResponseFormat == UnaiResponseFormat.JsonSchema)
+            {
+                if (!Config.EnableJsonSchema) throw new NotSupportedException("JSON Schema is disabled for this provider.");
+                if (request.Options.JsonSchema == null) throw new ArgumentException("JsonSchema output requires a schema.");
+            }
         }
     }
 }

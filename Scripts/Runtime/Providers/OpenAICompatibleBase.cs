@@ -12,12 +12,14 @@ namespace UnAI.Providers
     public abstract class OpenAICompatibleBase : UnaiProviderBase
     {
         protected virtual string ChatEndpointPath => "/v1/chat/completions";
+        protected override string ModelsEndpointPath => "/v1/models";
+        protected virtual bool RequestStreamingUsage => Config.IncludeStreamingUsage;
 
-        public override bool SupportsToolCalling => true;
+        public override bool SupportsToolCalling => Config?.EnableToolCalling ?? true;
 
         protected override string BuildRequestUrl(UnaiChatRequest request)
         {
-            return Config.BaseUrl.TrimEnd('/') + ChatEndpointPath;
+            return BuildEndpointUrl(ChatEndpointPath);
         }
 
         protected override Dictionary<string, string> BuildHeaders()
@@ -53,7 +55,7 @@ namespace UnAI.Providers
             };
 
             // Request usage stats in streaming responses
-            if (request.Stream)
+            if (request.Stream && RequestStreamingUsage)
             {
                 obj["stream_options"] = new JObject { ["include_usage"] = true };
             }

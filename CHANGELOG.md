@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Account/server model discovery, editor model selection and provider capability controls
 - Optional UPM samples, including minimal runtime chat without UI or Agent dependencies
 - Repository guides for provider configuration, MCP setup and troubleshooting
 - Source-based maintenance review with prioritized fixes and verification criteria
@@ -21,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- OpenAI completion limits, compatible endpoint normalization and optional streaming usage
+- Gemini tool signature/history preservation and current Claude/Gemini model suggestions
 - Gemini header authentication and central diagnostic credential redaction
 - Local MCP requires a bearer token, validates origins and exposes only read-only tools by default
 - Streaming timeouts, trailing usage, final-event flushing and task settlement in Editor and Play Mode

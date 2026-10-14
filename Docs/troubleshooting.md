@@ -16,7 +16,7 @@ The HTTP layer starts Unity coroutines. Invoke requests from Unity's main thread
 | Provider is null or cannot send requests | Initialize the registry, enable the provider, check its ID and base URL, and assign the config |
 | 401 / 403 | Check the resolved key and account access; environment variables take precedence over the asset field |
 | Invalid model / 400 | Enter a model ID available to your account and start with no optional request settings |
-| 404 on an OpenAI-compatible server | The adapter appends `/v1/chat/completions`; avoid duplicating `/v1` in `BaseUrl` |
+| 404 on an OpenAI-compatible server | Base URLs with or without `/v1` are normalized; exclude `/chat/completions` and check custom gateway paths |
 | 429 | Check provider limits; retryable requests use backoff and optional configured fallback |
 | Garbled accents or emoji while streaming | The streaming handler decodes UTF-8 incrementally; inspect server encoding and report a sanitized reproduction if text is still corrupted |
 | Streaming never finishes | Streaming honors `TimeoutSeconds`; use a cancellation token for an additional caller deadline |

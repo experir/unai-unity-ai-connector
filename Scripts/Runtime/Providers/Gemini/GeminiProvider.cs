@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Streaming;
@@ -12,15 +13,16 @@ namespace UnAI.Providers.Gemini
     {
         public override string ProviderId => "gemini";
         public override string DisplayName => "Google Gemini";
-        public override bool SupportsToolCalling => true;
+        public override bool SupportsToolCalling => Config?.EnableToolCalling ?? true;
+        protected override string ModelsEndpointPath => "/v1beta/models";
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
+            new UnaiModelInfo { Id = "gemini-3.8-flash", DisplayName = "Gemini 3.8 Flash", ProviderId = "gemini" },
+            new UnaiModelInfo { Id = "gemini-3.5-flash-lite", DisplayName = "Gemini 3.5 Flash-Lite", ProviderId = "gemini" },
             new UnaiModelInfo { Id = "gemini-2.5-flash", DisplayName = "Gemini 2.5 Flash", ProviderId = "gemini", MaxContextTokens = 1048576 },
             new UnaiModelInfo { Id = "gemini-2.5-flash-lite", DisplayName = "Gemini 2.5 Flash Lite", ProviderId = "gemini", MaxContextTokens = 1048576 },
             new UnaiModelInfo { Id = "gemini-2.5-pro", DisplayName = "Gemini 2.5 Pro", ProviderId = "gemini", MaxContextTokens = 1048576 },
-            new UnaiModelInfo { Id = "gemini-3-pro-preview", DisplayName = "Gemini 3 Pro (Preview)", ProviderId = "gemini", MaxContextTokens = 1048576 },
-            new UnaiModelInfo { Id = "gemini-3-flash-preview", DisplayName = "Gemini 3 Flash (Preview)", ProviderId = "gemini", MaxContextTokens = 1048576 },
         };
 
         protected override string BuildRequestUrl(UnaiChatRequest request)
@@ -76,6 +78,12 @@ namespace UnAI.Providers.Gemini
 
                 if (msg.Role == UnaiRole.Assistant && msg.ToolCalls is { Count: > 0 })
                 {
+                    var originalParts = msg.ToolCalls[0].ProviderMetadata?["geminiParts"] as JArray;
+                    if (originalParts != null)
+                    {
+                        contents.Add(new JObject { ["role"] = "model", ["parts"] = originalParts.DeepClone() });
+                        continue;
+                    }
                     var parts = new JArray();
                     if (!string.IsNullOrEmpty(msg.Content))
                         parts.Add(new JObject { ["text"] = msg.Content });
@@ -157,7 +165,7 @@ namespace UnAI.Providers.Gemini
         protected override UnaiChatResponse DeserializeResponse(string json)
         {
             var root = JObject.Parse(json);
-            var candidate = root["candidates"]?[0];
+            var candidate = (root["candidates"] as JArray)?.FirstOrDefault();
             var parts = candidate?["content"]?["parts"] as JArray;
 
             string text = "";
@@ -169,7 +177,7 @@ namespace UnAI.Providers.Gemini
                 {
                     if (part["text"] != null)
                     {
-                        text += part["text"].ToString();
+                        if (part["thought"]?.Value<bool>() != true) text += part["text"].ToString();
                     }
                     else if (part["functionCall"] is JObject fc)
                     {
@@ -183,6 +191,9 @@ namespace UnAI.Providers.Gemini
                     }
                 }
             }
+
+            if (toolCalls is { Count: > 0 })
+                toolCalls[0].ProviderMetadata = new JObject { ["geminiParts"] = parts.DeepClone() };
 
             return new UnaiChatResponse
             {
@@ -208,20 +219,27 @@ namespace UnAI.Providers.Gemini
 
         protected override ISseLineParser CreateStreamParser()
         {
+            var originalParts = new JArray();
+            var toolCalls = new List<UnaiToolCall>();
             return new SseLineParser(
                 deltaFactory: (eventType, jsonData) =>
                 {
                     var root = JObject.Parse(jsonData);
-                    var candidate = root["candidates"]?[0];
-                    string text = candidate?["content"]?["parts"]?[0]?["text"]?.ToString() ?? "";
-                    string finishReason = candidate?["finishReason"]?.ToString();
-                    bool isFinal = finishReason != null && finishReason != "null" && finishReason != "STOP";
+                    var candidate = (root["candidates"] as JArray)?.FirstOrDefault();
+                    if (candidate?["content"]?["parts"] is JArray parts)
+                        foreach (var part in parts) originalParts.Add(part.DeepClone());
+                    var response = DeserializeResponse(jsonData);
+                    if (response.ToolCalls != null) toolCalls.AddRange(response.ToolCalls);
+                    if (toolCalls.Count > 0)
+                        toolCalls[0].ProviderMetadata = new JObject { ["geminiParts"] = originalParts.DeepClone() };
 
                     return new UnaiStreamDelta
                     {
-                        Content = text,
-                        IsFinal = isFinal || (finishReason == "STOP"),
-                        FinishReason = finishReason,
+                        Content = response.Content,
+                        IsFinal = response.FinishReason != null,
+                        FinishReason = response.FinishReason,
+                        ToolCalls = toolCalls.Count > 0 ? new List<UnaiToolCall>(toolCalls) : null,
+                        Usage = response.Usage,
                         EventType = eventType
                     };
                 },

@@ -13,12 +13,16 @@ namespace UnAI.Providers.Anthropic
     {
         public override string ProviderId => "anthropic";
         public override string DisplayName => "Anthropic Claude";
-        public override bool SupportsToolCalling => true;
+        public override bool SupportsToolCalling => Config?.EnableToolCalling ?? true;
+        protected override string ModelsEndpointPath => "/v1/models";
 
         private const string AnthropicVersion = "2023-06-01";
 
         public override IReadOnlyList<UnaiModelInfo> KnownModels => new[]
         {
+            new UnaiModelInfo { Id = "claude-sonnet-5-5", DisplayName = "Claude Sonnet 5.5", ProviderId = "anthropic", MaxContextTokens = 1000000 },
+            new UnaiModelInfo { Id = "claude-opus-5-5", DisplayName = "Claude Opus 5.5", ProviderId = "anthropic", MaxContextTokens = 1000000 },
+            new UnaiModelInfo { Id = "claude-haiku-5-5", DisplayName = "Claude Haiku 5.5", ProviderId = "anthropic", MaxContextTokens = 1000000 },
             new UnaiModelInfo { Id = "claude-opus-4-6", DisplayName = "Claude Opus 4.6", ProviderId = "anthropic", MaxContextTokens = 200000 },
             new UnaiModelInfo { Id = "claude-sonnet-4-5-20250929", DisplayName = "Claude Sonnet 4.5", ProviderId = "anthropic", MaxContextTokens = 200000 },
             new UnaiModelInfo { Id = "claude-haiku-4-5-20251001", DisplayName = "Claude Haiku 4.5", ProviderId = "anthropic", MaxContextTokens = 200000 },

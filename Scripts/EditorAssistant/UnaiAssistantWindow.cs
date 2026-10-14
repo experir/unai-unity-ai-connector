@@ -22,6 +22,9 @@ namespace UnAI.Editor.Assistant
         private UnaiAgent _agent;
         private CancellationTokenSource _cts;
         private bool _isProcessing;
+        private bool _loadingModels;
+        private string[] _modelCatalog = Array.Empty<string>();
+        private CancellationTokenSource _modelCatalogCts;
         private string _streamingContent = "";
 
         // UI state (serialized to survive domain reload)
@@ -103,6 +106,7 @@ namespace UnAI.Editor.Assistant
             // Save conversation state before potential domain reload
             SaveConversationState();
             CancelRequest();
+            _modelCatalogCts?.Cancel();
         }
 
         private void OnDestroy()
@@ -264,6 +268,7 @@ namespace UnAI.Editor.Assistant
             if (EditorGUI.EndChangeCheck())
             {
                 _modelOverride = "";
+                _modelCatalog = Array.Empty<string>();
                 ResetAgent();
             }
 
@@ -273,6 +278,16 @@ namespace UnAI.Editor.Assistant
             string placeholder = string.IsNullOrEmpty(_modelOverride) ? defaultModel : _modelOverride;
             _modelOverride = EditorGUILayout.TextField(_modelOverride,
                 EditorStyles.toolbarTextField, GUILayout.MinWidth(120));
+            EditorGUI.BeginDisabledGroup(_loadingModels || _isProcessing);
+            if (GUILayout.Button(_loadingModels ? "Loading" : "Models", EditorStyles.toolbarButton, GUILayout.Width(60)))
+                RefreshModels();
+            EditorGUI.EndDisabledGroup();
+            if (_modelCatalog.Length > 0)
+            {
+                var choices = new[] { "Select model" }.Concat(_modelCatalog).ToArray();
+                int selected = EditorGUILayout.Popup(0, choices, EditorStyles.toolbarPopup, GUILayout.Width(100));
+                if (selected > 0) { _modelOverride = _modelCatalog[selected - 1]; ResetAgent(); }
+            }
 
             // Max steps
             EditorGUILayout.LabelField("Steps:", GUILayout.Width(38));
@@ -303,6 +318,32 @@ namespace UnAI.Editor.Assistant
             }
 
             EditorGUILayout.EndHorizontal();
+        }
+
+        private async void RefreshModels()
+        {
+            string id = GetSelectedProviderId();
+            if (UnaiProviderRegistry.Get(id) is not IUnaiModelProvider catalog || !catalog.SupportsModelDiscovery)
+            {
+                Debug.LogWarning("[UNAI] Model discovery is unavailable for this provider. Enter a model ID manually.");
+                return;
+            }
+            _loadingModels = true;
+            _modelCatalogCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                var models = await catalog.ListModelsAsync(_modelCatalogCts.Token);
+                if (id == GetSelectedProviderId()) _modelCatalog = models.Select(m => m.Id).ToArray();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Debug.LogWarning($"[UNAI] Could not list models: {ex.Message}"); }
+            finally
+            {
+                _modelCatalogCts?.Dispose();
+                _modelCatalogCts = null;
+                _loadingModels = false;
+                if (this != null) Repaint();
+            }
         }
 
         private void DrawChatArea()

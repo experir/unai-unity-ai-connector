@@ -16,7 +16,8 @@ namespace UnAI.Providers.Ollama
     {
         public override string ProviderId => "ollama";
         public override string DisplayName => "Ollama (Local)";
-        public override bool SupportsToolCalling => true;
+        public override bool SupportsToolCalling => Config?.EnableToolCalling ?? true;
+        protected override string ModelsEndpointPath => "/api/tags";
 
         protected override string BuildRequestUrl(UnaiChatRequest request)
         {

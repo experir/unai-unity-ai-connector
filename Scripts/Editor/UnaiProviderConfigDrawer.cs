@@ -39,6 +39,9 @@ namespace UnAI.Editor
                     DrawField(ref y, position, property, "DefaultModel", lineHeight);
                     DrawField(ref y, position, property, "TimeoutSeconds", lineHeight);
                     DrawField(ref y, position, property, "MaxRetries", lineHeight);
+                    DrawField(ref y, position, property, "EnableToolCalling", lineHeight);
+                    DrawField(ref y, position, property, "EnableJsonSchema", lineHeight);
+                    DrawField(ref y, position, property, "IncludeStreamingUsage", lineHeight);
                     DrawField(ref y, position, property, "CustomHeaders", lineHeight);
                 }
 
@@ -78,6 +81,7 @@ namespace UnAI.Editor
                 height += lineHeight; // DefaultModel
                 height += lineHeight; // TimeoutSeconds
                 height += lineHeight; // MaxRetries
+                height += lineHeight * 3; // Capability overrides
 
                 var customHeaders = property.FindPropertyRelative("CustomHeaders");
                 if (customHeaders != null)

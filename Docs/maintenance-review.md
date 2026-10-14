@@ -82,6 +82,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 7. Test provider capabilities before updating model suggestions
 
+**Implemented and verified:** separate OpenAI completion limits, compatible streaming-usage opt-in, capability controls, endpoint normalization, paginated account/server model discovery and an editor model picker. Gemini tool parts/signatures round-trip in non-streaming and streaming responses. New Claude/Gemini config defaults and suggestions were checked against official catalogs on 2026-10-14; existing config assets retain their models. All nine serializers and local model API fixtures pass. Live cloud calls remain unverified; a separate Responses adapter remains a future extension.
+
 **Evidence:** model IDs and context sizes are hardcoded in provider `KnownModels` and `UnaiGlobalConfig`. [OpenAICompatibleBase.cs](../Scripts/Runtime/Providers/OpenAICompatibleBase.cs) sends `max_tokens` for every compatible service and unconditionally adds streaming usage options. Anthropic's JSON behavior is prompt-based; Cohere native tools are not implemented in its adapter.
 
 **Proposed fix:** separate provider-specific parameter mappings from generic compatibility behavior, add capability flags, validate unsupported options, and refresh model suggestions/defaults against provider documentation and real fixtures. Add model discovery where available while keeping manual IDs. OpenAI's [Chat Completions reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) documents `max_tokens` as deprecated in favor of `max_completion_tokens`; keep generic server compatibility when adapting this.
