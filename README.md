@@ -465,6 +465,8 @@ This table describes the implementation, not a tested compatibility matrix. See 
 
 Documentation lives in this repository and is versioned with the package.
 
+The refresh is prepared as **1.1.0-beta.1** on `main`. It is a beta candidate, not a tagged release. Existing users should follow the [upgrade instructions](Docs/upgrading.md), particularly for samples and MCP authentication.
+
 | Guide | Description |
 |-------|-------------|
 | [Installation](#installation) and [Quick Start](#quick-start) | Package setup and first request |
@@ -477,6 +479,7 @@ Documentation lives in this repository and is versioned with the package.
 | [Maintenance review](Docs/maintenance-review.md) | Prioritized findings and proposed refresh work |
 | [Refresh validation](Docs/validation.md) | Tested Unity version, regression coverage, builds and remaining verification |
 | [Live integration checks](Docs/live-validation.md) | Tested MCP clients and an explicit local/cloud provider runner |
+| [Upgrading to the beta](Docs/upgrading.md) | Sample migration, MCP authentication and release status |
 
 ## Contributing
 

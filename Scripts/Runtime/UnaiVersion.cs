@@ -7,7 +7,7 @@ namespace UnAI
     public static class UnaiVersion
     {
         /// <summary>Baked version — checked against package.json by CI.</summary>
-        public const string Current = "1.0.0";
+        public const string Current = "1.1.0-beta.1";
 
 #if UNITY_EDITOR
         /// <summary>

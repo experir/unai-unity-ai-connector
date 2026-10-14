@@ -1,6 +1,6 @@
 {
     "name": "com.unai.universal-ai-connector",
-    "version": "1.0.0",
+    "version": "1.1.0-beta.1",
     "displayName": "UNAI - Universal AI Connector",
     "description": "Universal AI connector for Unity. Unified C# API for OpenAI GPT-5, Anthropic Claude, Google Gemini, Mistral, Cohere, Ollama, LM Studio, llama.cpp, xAI Grok, DeepSeek, and any OpenAI-compatible LLM. Real-time streaming, async/await, cross-platform (Windows, Mac, Linux, Android, iOS, WebGL). Build AI-powered NPCs, chatbots, and tools.",
     "unity": "6000.0",

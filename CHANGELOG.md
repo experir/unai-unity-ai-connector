@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-beta.1] - 2026-10-14
+
+Beta candidate prepared on `main`; no release tag has been published. See [upgrade instructions](Docs/upgrading.md) and [validation coverage](Docs/validation.md) before adopting it.
+
 ### Added
 - Explicit MCP client probes and opt-in live-provider validation tooling with sanitized reports
 - Reproducible module/sample validation projects and GitHub metadata, Unity test and player build workflows
