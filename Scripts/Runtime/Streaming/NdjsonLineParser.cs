@@ -38,8 +38,7 @@ namespace UnAI.Streaming
             }
             catch (Exception ex)
             {
-                UnaiLogger.LogWarning($"[UNAI] Failed to parse NDJSON line: {ex.Message}");
-                return null;
+                throw new FormatException("Invalid NDJSON event payload.", ex);
             }
         }
 

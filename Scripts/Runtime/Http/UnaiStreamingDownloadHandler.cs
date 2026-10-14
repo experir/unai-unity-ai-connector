@@ -12,6 +12,7 @@ namespace UnAI.Http
         private readonly Action<string> _onLineReceived;
         private readonly Action _onComplete;
         private bool _isComplete;
+        public Exception ProcessingError { get; private set; }
 
         private static readonly int BufferSize = 4096;
 
@@ -25,6 +26,12 @@ namespace UnAI.Http
         }
 
         protected override bool ReceiveData(byte[] data, int dataLength)
+        {
+            try { return DecodeData(data, dataLength); }
+            catch (Exception ex) { ProcessingError = ex; return false; }
+        }
+
+        private bool DecodeData(byte[] data, int dataLength)
         {
             if (_isComplete) return false;
 
@@ -64,6 +71,13 @@ namespace UnAI.Http
         }
 
         protected override void CompleteContent()
+        {
+            if (ProcessingError != null) return;
+            try { FinishContent(); }
+            catch (Exception ex) { ProcessingError = ex; }
+        }
+
+        private void FinishContent()
         {
             _isComplete = true;
             int count = _decoder.GetChars(Array.Empty<byte>(), 0, 0, _characters, 0, true);

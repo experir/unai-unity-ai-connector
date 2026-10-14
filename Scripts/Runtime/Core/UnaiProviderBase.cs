@@ -94,67 +94,42 @@ namespace UnAI.Core
                 var parser = CreateStreamParser();
                 UnaiChatResponse finalResponse = null;
                 UnaiErrorInfo streamError = null;
+                bool emittedOutput = false;
+                finalResponse = new UnaiChatResponse
+                {
+                    Content = "", Model = request.Model, ProviderId = ProviderId, WasStreamed = true
+                };
 
                 await UnaiHttpStreamClient.StreamPostAsync(
                     url, body, headers, parser,
                     onDelta: delta =>
                     {
+                        if (!string.IsNullOrEmpty(delta.Content) || delta.ToolCalls is { Count: > 0 })
+                            emittedOutput = true;
+                        finalResponse.Content = delta.AccumulatedContent ?? finalResponse.Content;
+                        finalResponse.FinishReason = delta.FinishReason ?? finalResponse.FinishReason;
+                        finalResponse.ToolCalls = delta.ToolCalls ?? finalResponse.ToolCalls;
+                        finalResponse.Usage = delta.Usage ?? finalResponse.Usage;
                         onDelta?.Invoke(delta);
-
-                        if (delta.IsFinal)
-                        {
-                            finalResponse = new UnaiChatResponse
-                            {
-                                Content = delta.AccumulatedContent,
-                                Role = UnaiRole.Assistant,
-                                Model = request.Model,
-                                ProviderId = ProviderId,
-                                FinishReason = delta.FinishReason,
-                                WasStreamed = true,
-                                ToolCalls = delta.ToolCalls,
-                                Usage = delta.Usage
-                            };
-                        }
-                        else if (delta.ToolCalls is { Count: > 0 })
-                        {
-                            // Capture tool calls from intermediate deltas too
-                            if (finalResponse == null)
-                            {
-                                finalResponse = new UnaiChatResponse
-                                {
-                                    Content = delta.AccumulatedContent,
-                                    Role = UnaiRole.Assistant,
-                                    Model = request.Model,
-                                    ProviderId = ProviderId,
-                                    WasStreamed = true
-                                };
-                            }
-                            finalResponse.ToolCalls = delta.ToolCalls;
-                        }
                     },
                     onComplete: () =>
                     {
-                        finalResponse ??= new UnaiChatResponse
-                        {
-                            Content = "",
-                            ProviderId = ProviderId,
-                            WasStreamed = true
-                        };
                         onComplete?.Invoke(finalResponse);
                     },
                     onError: error =>
                     {
                         error.ProviderId = ProviderId;
+                        error.HasPartialOutput = emittedOutput;
                         streamError = error;
                     },
-                    cancellationToken);
+                    cancellationToken, Config.TimeoutSeconds);
 
                 // If no error, we're done
                 if (streamError == null)
                     return;
 
                 // If the error is not retryable or we've exhausted retries, report it
-                if (!streamError.IsRetryable || attempt >= maxRetries)
+                if (!streamError.IsRetryable || emittedOutput || attempt >= maxRetries)
                 {
                     onError?.Invoke(streamError);
                     return;

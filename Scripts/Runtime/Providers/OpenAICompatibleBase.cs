@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnAI.Core;
 using UnAI.Models;
 using UnAI.Streaming;
@@ -222,7 +223,7 @@ namespace UnAI.Providers
                 deltaFactory: (eventType, jsonData) =>
                 {
                     var root = JObject.Parse(jsonData);
-                    var choice = root["choices"]?[0];
+                    var choice = (root["choices"] as JArray)?.FirstOrDefault();
                     var delta = choice?["delta"];
                     string content = delta?["content"]?.ToString() ?? "";
                     string finishReason = choice?["finish_reason"]?.ToString();
@@ -271,7 +272,8 @@ namespace UnAI.Providers
                     var streamDelta = new UnaiStreamDelta
                     {
                         Content = content,
-                        IsFinal = isFinal,
+                        // A finish_reason can precede the usage chunk. [DONE] ends the stream.
+                        IsFinal = false,
                         FinishReason = isFinal ? finishReason : null,
                         EventType = eventType,
                         Usage = usage

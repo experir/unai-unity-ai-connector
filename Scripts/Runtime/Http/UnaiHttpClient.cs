@@ -19,7 +19,9 @@ namespace UnAI.Http
             int timeoutSeconds = 120)
         {
             var tcs = new TaskCompletionSource<(string, int, UnaiErrorInfo)>();
-            UnaiCoroutineRunner.Run(PostCoroutine(url, jsonBody, headers, cancellationToken, timeoutSeconds, tcs));
+            UnaiCoroutineRunner.Run(UnaiCoroutineRunner.Guard(
+                PostCoroutine(url, jsonBody, headers, cancellationToken, timeoutSeconds, tcs),
+                ex => tcs.TrySetException(ex), () => tcs.TrySetCanceled()));
             return tcs.Task;
         }
 
@@ -31,6 +33,11 @@ namespace UnAI.Http
             int timeoutSeconds,
             TaskCompletionSource<(string, int, UnaiErrorInfo)> tcs)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled();
+                yield break;
+            }
             UnaiLogger.LogRawJson("REQUEST", url, jsonBody);
 
             byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody);

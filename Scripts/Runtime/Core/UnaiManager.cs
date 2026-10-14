@@ -145,13 +145,20 @@ namespace UnAI.Core
                 var p = providersToTry[i];
                 bool failed = false;
                 UnaiErrorInfo streamError = null;
+                bool emittedOutput = false;
 
                 await p.ChatStreamAsync(
-                    CreateProviderRequest(request, p, i > 0), onDelta,
+                    CreateProviderRequest(request, p, i > 0),
+                    onDelta: delta =>
+                    {
+                        if (!string.IsNullOrEmpty(delta.Content) || delta.ToolCalls is { Count: > 0 })
+                            emittedOutput = true;
+                        onDelta?.Invoke(delta);
+                    },
                     onComplete: response => onComplete?.Invoke(response),
                     onError: error =>
                     {
-                        if (error.IsRetryable && i < providersToTry.Count - 1)
+                        if (error.IsRetryable && !error.HasPartialOutput && !emittedOutput && i < providersToTry.Count - 1)
                         {
                             failed = true;
                             streamError = error;

@@ -8,4 +8,9 @@ namespace UnAI.Streaming
         bool IsComplete { get; }
         void Reset();
     }
+
+    public interface IUnaiStreamCompletionParser
+    {
+        UnaiStreamDelta Complete();
+    }
 }

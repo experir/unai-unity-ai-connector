@@ -5,7 +5,7 @@ using UnAI.Utilities;
 
 namespace UnAI.Streaming
 {
-    public class SseLineParser : ISseLineParser
+    public class SseLineParser : ISseLineParser, IUnaiStreamCompletionParser
     {
         private string _currentEventType;
         private string _currentData;
@@ -66,8 +66,7 @@ namespace UnAI.Streaming
                     }
                     catch (Exception ex)
                     {
-                        UnaiLogger.LogWarning($"[UNAI] Failed to parse stream chunk: {ex.Message}");
-                        return null;
+                        throw new FormatException("Invalid SSE event payload.", ex);
                     }
                 }
                 return null;
@@ -89,6 +88,16 @@ namespace UnAI.Streaming
             // Ignore "id:", "retry:", and comment lines starting with ":"
 
             return null;
+        }
+
+        public UnaiStreamDelta Complete()
+        {
+            if (IsComplete) return null;
+            var delta = ProcessLine("");
+            IsComplete = true;
+            delta ??= new UnaiStreamDelta { AccumulatedContent = _accumulated.ToString() };
+            delta.IsFinal = true;
+            return delta;
         }
 
         public void Reset()

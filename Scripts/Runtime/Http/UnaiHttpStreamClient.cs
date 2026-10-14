@@ -21,14 +21,16 @@ namespace UnAI.Http
             Action<UnaiStreamDelta> onDelta,
             Action onComplete,
             Action<UnaiErrorInfo> onError,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int timeoutSeconds = 120)
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            UnaiCoroutineRunner.Run(StreamCoroutine(
+            UnaiCoroutineRunner.Run(UnaiCoroutineRunner.Guard(StreamCoroutine(
                 url, jsonBody, headers, lineParser,
                 onDelta, onComplete, onError,
-                cancellationToken, tcs));
+                cancellationToken, timeoutSeconds, tcs),
+                ex => tcs.TrySetException(ex), () => tcs.TrySetCanceled()));
 
             return tcs.Task;
         }
@@ -42,8 +44,14 @@ namespace UnAI.Http
             Action onComplete,
             Action<UnaiErrorInfo> onError,
             CancellationToken cancellationToken,
+            int timeoutSeconds,
             TaskCompletionSource<bool> tcs)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled();
+                yield break;
+            }
             UnaiLogger.LogRawJson("STREAM_REQUEST", url, jsonBody);
 
             string lastAccumulatedContent = null;
@@ -53,6 +61,7 @@ namespace UnAI.Http
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(bodyBytes);
             request.uploadHandler.contentType = "application/json";
+            request.timeout = timeoutSeconds;
 
             var downloadHandler = new UnaiStreamingDownloadHandler(
                 onLineReceived: line =>
@@ -65,7 +74,18 @@ namespace UnAI.Http
                         onDelta?.Invoke(delta);
                     }
                 },
-                onComplete: () => { }
+                onComplete: () =>
+                {
+                    if (lineParser is IUnaiStreamCompletionParser completionParser)
+                    {
+                        var delta = completionParser.Complete();
+                        if (delta != null)
+                        {
+                            lastAccumulatedContent = delta.AccumulatedContent;
+                            onDelta?.Invoke(delta);
+                        }
+                    }
+                }
             );
             request.downloadHandler = downloadHandler;
 
@@ -90,7 +110,17 @@ namespace UnAI.Http
                 yield return null;
             }
 
-            if (request.result == UnityWebRequest.Result.ConnectionError ||
+            if (downloadHandler.ProcessingError != null)
+            {
+                onError?.Invoke(new UnaiErrorInfo
+                {
+                    ErrorType = UnaiErrorType.StreamingError,
+                    Message = "Could not process streaming response: " + downloadHandler.ProcessingError.Message,
+                    InnerException = downloadHandler.ProcessingError
+                });
+                tcs.TrySetResult(false);
+            }
+            else if (request.result == UnityWebRequest.Result.ConnectionError ||
                 request.result == UnityWebRequest.Result.ProtocolError ||
                 request.result == UnityWebRequest.Result.DataProcessingError)
             {

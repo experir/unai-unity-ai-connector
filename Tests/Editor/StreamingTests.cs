@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
 using UnAI.Http;
+using UnAI.Models;
+using UnAI.Streaming;
 
 namespace UnAI.Tests
 {
@@ -44,11 +46,31 @@ namespace UnAI.Tests
         }
 
         [Test]
+        public void SseFlushesAnEventWithoutFinalBlankLine()
+        {
+            var parser = new SseLineParser((_, data) => new UnaiStreamDelta { Content = data });
+            Assert.IsNull(parser.ProcessLine("data: hello"));
+            var final = parser.Complete();
+            Assert.AreEqual("hello", final.AccumulatedContent);
+            Assert.IsTrue(final.IsFinal);
+            Assert.IsTrue(parser.IsComplete);
+        }
+
+        [Test]
+        public void MalformedSseIsReported()
+        {
+            var parser = new SseLineParser((_, _) => throw new Exception("bad payload"));
+            parser.ProcessLine("data: malformed");
+            Assert.Throws<FormatException>(() => parser.ProcessLine(""));
+        }
+
+        [Test]
         public void TruncatedUtf8FailsInsteadOfCorruptingText()
         {
             using var handler = new Handler(_ => { });
             handler.Feed(new byte[] { 0xf0, 0x9f });
-            Assert.Throws<DecoderFallbackException>(handler.Finish);
+            handler.Finish();
+            Assert.IsInstanceOf<DecoderFallbackException>(handler.ProcessingError);
         }
     }
 }

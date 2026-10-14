@@ -19,7 +19,7 @@ The HTTP layer starts Unity coroutines. Invoke requests from Unity's main thread
 | 404 on an OpenAI-compatible server | The adapter appends `/v1/chat/completions`; avoid duplicating `/v1` in `BaseUrl` |
 | 429 | Check provider limits; retryable requests use backoff and optional configured fallback |
 | Garbled accents or emoji while streaming | The streaming handler decodes UTF-8 incrementally; inspect server encoding and report a sanitized reproduction if text is still corrupted |
-| Streaming never finishes | Streaming currently ignores `TimeoutSeconds`; pass a cancellation token with a deadline |
+| Streaming never finishes | Streaming honors `TimeoutSeconds`; use a cancellation token for an additional caller deadline |
 | JSON response does not match your schema | Enforcement differs by adapter; validate the result in your application |
 
 ## Cancellation and error handling

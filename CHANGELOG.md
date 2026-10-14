@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Streaming timeouts, trailing usage, final-event flushing and task settlement in Editor and Play Mode
+- Automatic streaming retry/fallback stops after partial output to avoid replaying content or tools
 - Cache identity includes complete resolved requests and provider context; cached responses are isolated
 - Provider fallback uses independent request snapshots and each backup's default model
 - Streaming UTF-8 decoding preserves split accented characters, CJK and emoji

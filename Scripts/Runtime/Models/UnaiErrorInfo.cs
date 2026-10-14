@@ -23,6 +23,8 @@ namespace UnAI.Models
         public string RawResponse { get; set; }
         public string ProviderId { get; set; }
         public Exception InnerException { get; set; }
+        /// <summary>Streaming produced content or tool calls before failing; do not replay automatically.</summary>
+        public bool HasPartialOutput { get; set; }
 
         /// <summary>
         /// Seconds to wait before retrying, parsed from the Retry-After response header.
@@ -53,7 +55,7 @@ namespace UnAI.Models
                         $"consider upgrading or adding credits.",
                     UnaiErrorType.Authentication =>
                         $"Authentication failed ({provider}). Your API key may be invalid, expired, " +
-                        $"or missing. Check your key in the UnAI configuration (Window > UnAI > Settings).",
+                        $"or missing. Check your key in the UnAI configuration (Window > UnAI > Hub).",
                     UnaiErrorType.InvalidRequest =>
                         $"Invalid request sent to {provider} (HTTP {HttpStatusCode}). " +
                         $"The model name may be incorrect, or the request format is unsupported. " +

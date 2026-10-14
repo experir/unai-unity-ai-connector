@@ -54,6 +54,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 5. Apply streaming timeouts and preserve final metadata
 
+**Implemented and verified:** streaming timeouts, explicit error settlement, editor coroutine pumping, final-event flushing and merged usage metadata. Retries and fallback stop after visible output. Local HTTP fixtures cover timeout, cancellation, Unicode, trailing usage, malformed payloads, partial-output replay protection and callback exceptions.
+
 **Evidence:** [UnaiHttpStreamClient.cs](../Scripts/Runtime/Http/UnaiHttpStreamClient.cs) does not take `TimeoutSeconds` or set `request.timeout`. [OpenAICompatibleBase.cs](../Scripts/Runtime/Providers/OpenAICompatibleBase.cs) marks a `finish_reason` chunk final, and [SseLineParser.cs](../Scripts/Runtime/Streaming/SseLineParser.cs) then ignores later chunks, including trailing usage.
 
 **Impact:** a stream can wait indefinitely without caller cancellation; usage arriving after the finish chunk is discarded. Provider retry and manager fallback can also replay content after partial output, with no reset signal to consumers.
