@@ -378,11 +378,11 @@ Use the URL shown in the server window. For Claude Code, HTTP registration uses:
 claude mcp add --transport http unity http://localhost:3389/mcp --header "Authorization: Bearer <token>"
 ```
 
-See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. This configuration has not been verified end to end against the local Unity server. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. Protocol exchanges have been tested with .NET HTTP and UnityWebRequest fixtures; the Claude Code UI itself has not been tested. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
 
 ### How it works
 
-- Uses JSON-RPC POST and SSE GET endpoints; advertises MCP `2025-03-26`, with known transport compliance gaps
+- Uses Streamable HTTP JSON POST responses, negotiates MCP `2025-11-25` or `2025-06-18`, and returns 405 for optional SSE GET
 - Runs inside Unity's process via `HttpListener` — full access to Unity API
 - Tool calls execute on the Unity main thread (safe for all Unity operations)
 - Exposes the tools registered with the server; the default window loads the editor assistant's factory via reflection

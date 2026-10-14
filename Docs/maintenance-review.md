@@ -102,6 +102,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 9. Finish MCP transport interoperability
 
+**Implemented and verified:** supported-version negotiation, session lifecycle, initialized notifications, 202 acknowledgements, JSON-only Streamable HTTP (GET 405), header/shape validation, bounded requests and session-scoped cancellation. Main-thread work is queued safely and cancelled on stop/reload. Two HTTP client implementations exercise the live Unity endpoint; GUI clients remain unverified.
+
 **Evidence:** [UnaiMcpProtocol.cs](../Scripts/MCP/UnaiMcpProtocol.cs) fixes the protocol version to `2025-03-26`. The server returns 204 for accepted notifications, instead of that revision's required 202, and its GET SSE stream sends an endpoint payload without completing an interoperability test.
 
 **Proposed fix:** choose supported protocol revisions explicitly, negotiate initialization, align notification status codes and SSE behavior, validate requests/headers, and settle pending main-thread work when the server stops or the editor reloads. Add bounded request sizes and request deadlines.

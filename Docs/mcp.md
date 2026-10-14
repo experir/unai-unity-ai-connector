@@ -33,11 +33,15 @@ Tools run on Unity's main thread. The default read-only catalog contains scene/o
 
 ## Current protocol limitations
 
-The implementation advertises MCP `2025-03-26` and handles `initialize`, `ping`, `tools/list`, and `tools/call`. It uses HTTP POST for JSON-RPC and GET for SSE connections. Full Streamable HTTP compliance and compatibility with each client have not been established.
+The implementation negotiates MCP `2025-11-25` or `2025-06-18`. POST requests return JSON; accepted notifications and responses return HTTP 202 with no body. A JSON-only Streamable HTTP server may return HTTP 405 for GET, which this server does. Legacy HTTP+SSE transport and JSON-RPC batch requests are not supported.
 
-Origin validation and bearer authentication are enforced before dispatch. Only the exact server origin is accepted when an Origin header is present; native local clients may omit it but still need the token. CORS no longer uses a wildcard. The remaining transport gap includes HTTP 204 for accepted notifications where the advertised specification requires 202. The SSE connection also needs interoperability testing. The [MCP transport specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) describes the transport and origin-validation requirements.
+`initialize` issues an `MCP-Session-Id`. Clients must include it on subsequent requests and send `notifications/initialized` before listing or calling tools. Include the negotiated `MCP-Protocol-Version` when supported by the client. Unknown sessions return 404; unsupported/mismatched protocol headers return 400. DELETE ends a session. Idle sessions expire after 30 minutes.
 
-The server binds to `localhost`, checks that the remote endpoint is loopback, and requires its generated bearer token. Keep the token private and use trusted local clients. See the [maintenance review](maintenance-review.md) for the proposed fixes and tests.
+Client cancellation is scoped to its session through `notifications/cancelled` and the original `requestId`. Request deadlines and editor shutdown/reload cancel queued and active work. Cancellation is cooperative and does not undo tool changes already made. Defaults are a 30-second request deadline, 1 MiB request body, 32 concurrent HTTP requests and 64 sessions. Configure `RequestTimeoutSeconds` and `MaxRequestBytes` on a custom server if needed.
+
+Origin validation and bearer authentication run before dispatch. Native local clients may omit Origin, but still need the token; browsers must use the exact server origin. CORS is restricted. The server binds to `localhost` and rejects non-loopback peers. Custom tools are not exposed as read-only unless explicitly marked.
+
+Unity tests exercise initialize/list/call/cancel exchanges with .NET HTTP and UnityWebRequest clients, including version negotiation, notification status, authorization, deadlines and request-size limits. Claude Code/Desktop and Cursor UI sessions have not been tested. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [maintenance review](maintenance-review.md).
 
 ## Troubleshooting
 
@@ -45,4 +49,4 @@ The server binds to `localhost`, checks that the remote endpoint is loopback, an
 - **Connection refused:** check that Unity is open, the server is running, and the client uses the configured port and `/mcp` path.
 - **Port already in use:** stop the conflicting process or choose another port before starting the server.
 - **Windows listener permission error:** inspect the `HttpListenerException`. If an HTTP URL reservation is required, have it scoped to the exact localhost URL and your Windows account. Avoid broad `Everyone` permissions or running the editor as administrator as a routine workaround.
-- **Client handshake fails:** confirm HTTP transport support and inspect the initialize exchange. Report the client version and sanitized Unity logs; a listening endpoint alone does not prove protocol compatibility.
+- **Client handshake fails:** confirm HTTP transport support, bearer header, session ID and negotiated version, then inspect the initialize exchange. Report the client version and sanitized Unity logs; a listening endpoint alone does not prove protocol compatibility.

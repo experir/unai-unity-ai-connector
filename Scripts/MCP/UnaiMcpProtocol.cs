@@ -11,17 +11,21 @@ namespace UnAI.MCP
 {
     public static class UnaiMcpProtocol
     {
-        public const string ProtocolVersion = "2025-03-26";
+        public const string ProtocolVersion = "2025-11-25";
+        public static bool SupportsVersion(string version) => version is "2025-11-25" or "2025-06-18";
+        public static string SelectVersion(string requested) => SupportsVersion(requested) ? requested : ProtocolVersion;
         public const string ServerName = "unai-unity";
         public static string ServerVersion => UnaiVersion.Get();
 
         public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, CancellationToken ct,
-            bool allowMutatingTools = false)
+            bool allowMutatingTools = false, Action<string, JObject> onNotification = null)
         {
             JObject request;
             try
             {
-                request = JObject.Parse(jsonBody);
+                var parsed = JToken.Parse(jsonBody);
+                if (parsed is not JObject obj) return MakeError(null, -32600, "Invalid Request: expected one JSON-RPC object.");
+                request = obj;
             }
             catch (Exception ex)
             {
@@ -29,16 +33,25 @@ namespace UnAI.MCP
             }
 
             string jsonrpc = request["jsonrpc"]?.ToString();
-            if (jsonrpc != "2.0")
+            if (request["jsonrpc"]?.Type != JTokenType.String || jsonrpc != "2.0")
                 return MakeError(request["id"], -32600, "Invalid Request: jsonrpc must be '2.0'");
 
             string method = request["method"]?.ToString();
             var id = request["id"];
+            if (id != null && id.Type is not (JTokenType.String or JTokenType.Integer or JTokenType.Float or JTokenType.Null))
+                return MakeError(null, -32600, "Invalid Request: unsupported id type.");
+            if (request["method"] == null && id != null && (request["result"] != null || request["error"] != null))
+                return null; // An accepted response has no response of its own.
+            if (request["method"]?.Type != JTokenType.String || string.IsNullOrEmpty(method))
+                return MakeError(id, -32600, "Invalid Request: method must be a nonempty string.");
+            if (request["params"] != null && request["params"] is not JObject)
+                return MakeError(id, -32602, "Invalid params: expected an object.");
             var parameters = request["params"] as JObject ?? new JObject();
 
             // Notifications (no id) — acknowledge silently
-            if (id == null || id.Type == JTokenType.Null)
+            if (request.Property("id") == null)
             {
+                onNotification?.Invoke(method, parameters);
                 HandleNotification(method);
                 return null; // No response for notifications
             }
@@ -47,17 +60,21 @@ namespace UnAI.MCP
             {
                 return method switch
                 {
-                    "initialize" => HandleInitialize(id),
+                    "initialize" => HandleInitialize(id, parameters),
                     "ping" => MakeResult(id, new JObject()),
                     "tools/list" => HandleToolsList(id, tools, allowMutatingTools),
                     "tools/call" => await HandleToolsCall(id, parameters, tools, ct, allowMutatingTools),
                     _ => MakeError(id, -32601, $"Method not found: {method}")
                 };
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                Debug.LogError($"[UNAI MCP] Error handling '{method}': {ex.Message}");
-                return MakeError(id, -32603, $"Internal error: {ex.Message}");
+                Debug.LogWarning($"[UNAI MCP] Error handling '{method}': {ex.Message}");
+                return MakeError(id, -32603, "Internal error while executing the request.");
             }
         }
 
@@ -77,11 +94,13 @@ namespace UnAI.MCP
             }
         }
 
-        private static string HandleInitialize(JToken id)
+        private static string HandleInitialize(JToken id, JObject parameters)
         {
+            if (parameters["protocolVersion"]?.Type != JTokenType.String)
+                return MakeError(id, -32602, "initialize requires a protocolVersion string.");
             var result = new JObject
             {
-                ["protocolVersion"] = ProtocolVersion,
+                ["protocolVersion"] = SelectVersion(parameters["protocolVersion"].ToString()),
                 ["capabilities"] = new JObject
                 {
                     ["tools"] = new JObject
@@ -129,8 +148,10 @@ namespace UnAI.MCP
             UnaiToolRegistry tools, CancellationToken ct, bool allowMutatingTools)
         {
             string toolName = parameters["name"]?.ToString();
-            if (string.IsNullOrEmpty(toolName))
+            if (parameters["name"]?.Type != JTokenType.String || string.IsNullOrEmpty(toolName))
                 return MakeError(id, -32602, "Missing required parameter: 'name'");
+            if (parameters["arguments"] != null && parameters["arguments"] is not JObject)
+                return MakeError(id, -32602, "Tool arguments must be an object.");
 
             var tool = tools.Get(toolName);
             if (tool == null)
@@ -185,7 +206,7 @@ namespace UnAI.MCP
             return response.ToString(Formatting.None);
         }
 
-        private static string MakeError(JToken id, int code, string message)
+        internal static string MakeError(JToken id, int code, string message)
         {
             var response = new JObject
             {

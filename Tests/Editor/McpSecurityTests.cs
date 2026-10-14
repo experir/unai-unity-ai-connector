@@ -71,10 +71,11 @@ namespace UnAI.Tests
             var request = WebRequest.CreateHttp(url);
             request.Method = "POST";
             request.ContentType = "application/json";
+            request.Accept = "application/json, text/event-stream";
             if (token != null) request.Headers["Authorization"] = "Bearer " + token;
             if (origin != null) request.Headers["Origin"] = origin;
             using (var writer = new StreamWriter(await request.GetRequestStreamAsync()))
-                await writer.WriteAsync("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}");
+                await writer.WriteAsync("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"fixture\",\"version\":\"1\"}}}");
             try { using var response = (HttpWebResponse)await request.GetResponseAsync(); return (int)response.StatusCode; }
             catch (WebException ex) when (ex.Response is HttpWebResponse)
             { using var response = (HttpWebResponse)ex.Response; return (int)response.StatusCode; }
