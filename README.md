@@ -364,7 +364,7 @@ The assistant uses the same agent system, so it reasons through multi-step tasks
 
 ## MCP Server
 
-UNAI includes an editor-only **Model Context Protocol (MCP)** server. With Editor Assistant installed, its default registry exposes the 32 built-in editor tools over local HTTP. The server runs in C# inside Unity.
+UNAI includes an editor-only **Model Context Protocol (MCP)** server. With Editor Assistant installed, its registry contains 32 tools. MCP exposes eight read-only tools by default; enable **Allow mutating tools** before starting to expose the full catalog. Copy the server's bearer token and configure your client's Authorization header. The server runs in C# inside Unity.
 
 ### Start the server
 
@@ -375,7 +375,7 @@ Open **Window > UnAI > MCP Server** and click **Start Server**.
 Use the URL shown in the server window. For Claude Code, HTTP registration uses:
 
 ```sh
-claude mcp add --transport http unity http://localhost:3389/mcp
+claude mcp add --transport http unity http://localhost:3389/mcp --header "Authorization: Bearer <token>"
 ```
 
 See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. This configuration has not been verified end to end against the local Unity server. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).

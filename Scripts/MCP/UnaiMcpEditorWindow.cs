@@ -9,6 +9,7 @@ namespace UnAI.MCP
     {
         [SerializeField] private int _port = 3389;
         [SerializeField] private bool _autoStart;
+        [SerializeField] private bool _allowMutatingTools;
 
         private UnaiMcpServer _server;
         private GUIStyle _statusStyle;
@@ -92,6 +93,9 @@ namespace UnAI.MCP
             EditorGUI.EndDisabledGroup();
 
             _autoStart = EditorGUILayout.Toggle("Auto-start on load", _autoStart);
+            EditorGUI.BeginDisabledGroup(running);
+            _allowMutatingTools = EditorGUILayout.Toggle("Allow mutating tools", _allowMutatingTools);
+            EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.Space(8);
 
@@ -114,10 +118,13 @@ namespace UnAI.MCP
                 EditorGUILayout.HelpBox(
                     "Configure a client that supports local HTTP MCP servers.\n\n" +
                     "Claude Code registration:\n" +
-                    $"claude mcp add --transport http unity {_server.Url}\n\n" +
+                    $"claude mcp add --transport http unity {_server.Url} " +
+                    "--header \"Authorization: Bearer <token>\"\n\n" +
                     "Client formats differ. See Docs/mcp.md for setup and " +
                     "current protocol limitations; compatibility must be verified with your client.",
                     MessageType.Info);
+                if (GUILayout.Button("Copy Bearer Token"))
+                    GUIUtility.systemCopyBuffer = _server.AccessToken;
 
                 if (GUILayout.Button("Copy URL to Clipboard"))
                 {
@@ -143,6 +150,7 @@ namespace UnAI.MCP
         {
             _server ??= new UnaiMcpServer();
             var tools = CreateToolRegistry();
+            _server.AllowMutatingTools = _allowMutatingTools;
             _server.Start(_port, tools);
             Repaint();
         }

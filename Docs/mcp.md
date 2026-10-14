@@ -9,12 +9,13 @@ UNAI runs an editor-only HTTP server inside Unity using `HttpListener`. It expos
 1. Keep `Runtime`, `Agent`, `MCP`, and `EditorAssistant` installed to expose the built-in editor tools.
 2. Open **Window > UnAI > MCP Server** and click **Start Server**.
 3. Check the Unity Console for the endpoint and exposed tool count.
-4. Configure a client that supports local HTTP MCP servers.
+4. Click **Copy Bearer Token**, then configure your client's `Authorization: Bearer <token>` header. Tokens are specific to a server instance and change after recreation or domain reload.
+5. Enable **Allow mutating tools** before starting only when you want tools that change the project. Read-only tools are the default.
 
 For Claude Code, the documented HTTP registration command is:
 
 ```sh
-claude mcp add --transport http unity http://localhost:3389/mcp
+claude mcp add --transport http unity http://localhost:3389/mcp --header "Authorization: Bearer <token>"
 claude mcp get unity
 ```
 
@@ -28,15 +29,15 @@ The MCP window loads `UnaiAssistantToolsFactory.CreateEditorToolRegistry()` thro
 
 Implementing `IUnaiTool` does not automatically register a tool in every context. Register runtime tools with the agent's `UnaiToolRegistry`. For the default editor assistant and MCP window, add editor tools to the shared factory. When starting a server from code, pass your own registry to `UnaiMcpServer.Start(port, tools)`.
 
-Tools run on Unity's main thread. Some tools can delete assets, modify scripts, install packages, or execute C#. Review the available tools before giving a client access.
+Tools run on Unity's main thread. The default read-only catalog contains scene/object inspection, selection, script reading, asset listing/search and project settings. Tools with side effects are hidden and rejected unless mutating tools are enabled. Custom tools default to mutating; set `Definition.IsReadOnly = true` only when all their operations have no side effects.
 
 ## Current protocol limitations
 
 The implementation advertises MCP `2025-03-26` and handles `initialize`, `ping`, `tools/list`, and `tools/call`. It uses HTTP POST for JSON-RPC and GET for SSE connections. Full Streamable HTTP compliance and compatibility with each client have not been established.
 
-Known gaps from source review include missing origin validation, wildcard CORS, no authentication, and HTTP 204 for accepted notifications where the advertised specification requires 202. The SSE connection also needs interoperability testing. The [MCP transport specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) describes the transport and origin-validation requirements.
+Origin validation and bearer authentication are enforced before dispatch. Only the exact server origin is accepted when an Origin header is present; native local clients may omit it but still need the token. CORS no longer uses a wildcard. The remaining transport gap includes HTTP 204 for accepted notifications where the advertised specification requires 202. The SSE connection also needs interoperability testing. The [MCP transport specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) describes the transport and origin-validation requirements.
 
-The server binds to `localhost`, but local binding alone does not replace origin checks. Use it only with trusted local clients while these gaps remain. See the [maintenance review](maintenance-review.md) for the proposed fixes and tests.
+The server binds to `localhost`, checks that the remote endpoint is loopback, and requires its generated bearer token. Keep the token private and use trusted local clients. See the [maintenance review](maintenance-review.md) for the proposed fixes and tests.
 
 ## Troubleshooting
 

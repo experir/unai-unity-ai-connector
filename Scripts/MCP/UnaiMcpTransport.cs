@@ -29,7 +29,6 @@ namespace UnAI.MCP
             _response.ContentType = "text/event-stream";
             _response.Headers.Add("Cache-Control", "no-cache");
             _response.Headers.Add("Connection", "keep-alive");
-            _response.Headers.Add("Access-Control-Allow-Origin", "*");
 
             _writer = new StreamWriter(_response.OutputStream, new UTF8Encoding(false))
             {

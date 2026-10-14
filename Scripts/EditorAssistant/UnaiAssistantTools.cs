@@ -72,6 +72,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "inspect_scene",
+            IsReadOnly = true,
             Description = "List all root GameObjects in the active scene with their child counts and active state.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -114,6 +115,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "find_gameobject",
+            IsReadOnly = true,
             Description = "Find GameObjects by name, tag, or component type. Returns matching objects with their paths.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -537,6 +539,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "inspect_gameobject",
+            IsReadOnly = true,
             Description = "Get detailed info about a GameObject: transform, all components, and their serialized properties.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -620,6 +623,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "read_script",
+            IsReadOnly = true,
             Description = "Read the contents of a C# script file from the project Assets folder.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -733,6 +737,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "list_assets",
+            IsReadOnly = true,
             Description = "List asset files in a project folder. Returns file names and types.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -796,6 +801,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "get_selection",
+            IsReadOnly = true,
             Description = "Get the currently selected objects in the Unity Editor.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",
@@ -1864,6 +1870,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "search_project",
+            IsReadOnly = true,
             Description = "Full-text search across project scripts and text assets. " +
                           "Finds files containing the search text and shows matching lines with context.",
             ParametersSchema = JObject.Parse(@"{
@@ -2105,6 +2112,7 @@ namespace UnAI.Editor.Assistant
         public override UnaiToolDefinition Definition => new()
         {
             Name = "get_project_settings",
+            IsReadOnly = true,
             Description = "Read Unity project settings: Physics, Quality, Time, or Player settings.",
             ParametersSchema = JObject.Parse(@"{
                 ""type"": ""object"",

@@ -18,6 +18,8 @@ namespace UnAI.MCP
         public bool IsRunning { get; private set; }
         public int ConnectedClients => _transport.ClientCount;
         public string Url => $"http://localhost:{Port}/mcp";
+        public string AccessToken { get; } = UnaiMcpAccessPolicy.CreateToken();
+        public bool AllowMutatingTools { get; set; }
 
         private HttpListener _listener;
         private CancellationTokenSource _cts;
@@ -56,8 +58,9 @@ namespace UnAI.MCP
 
                 if (ex is HttpListenerException)
                 {
-                    Debug.LogError("[UNAI MCP] Hint: On Windows, you may need to run Unity as Administrator, " +
-                                   "or grant permission with: netsh http add urlacl url=http://localhost:" + port + "/ user=Everyone");
+                    Debug.LogError("[UNAI MCP] On Windows, if an HTTP URL reservation is required, " +
+                                   "reserve only http://localhost:" + port + "/ for your Windows account. " +
+                                   "See Docs/mcp.md for account-scoped setup.");
                 }
             }
         }
@@ -111,16 +114,31 @@ namespace UnAI.MCP
             var request = context.Request;
             var response = context.Response;
 
+            if (request.RemoteEndPoint == null || !IPAddress.IsLoopback(request.RemoteEndPoint.Address)
+                || !UnaiMcpAccessPolicy.IsAllowedOrigin(request.Headers["Origin"], $"http://localhost:{Port}"))
+            {
+                response.StatusCode = 403;
+                WriteResponse(response, "{\"error\":\"Local client or origin not allowed.\"}");
+                return;
+            }
+
             // CORS preflight
             if (request.HttpMethod == "OPTIONS")
             {
-                SetCorsHeaders(response);
+                SetCorsHeaders(request, response);
                 response.StatusCode = 204;
                 response.Close();
                 return;
             }
 
-            SetCorsHeaders(response);
+            SetCorsHeaders(request, response);
+            if (!UnaiMcpAccessPolicy.IsAuthorized(request.Headers["Authorization"], AccessToken))
+            {
+                response.StatusCode = 401;
+                response.Headers.Add("WWW-Authenticate", "Bearer");
+                WriteResponse(response, "{\"error\":\"A valid local MCP bearer token is required.\"}");
+                return;
+            }
 
             string path = request.Url.AbsolutePath.TrimEnd('/');
 
@@ -172,7 +190,7 @@ namespace UnAI.MCP
             {
                 try
                 {
-                    result = await UnaiMcpProtocol.HandleRequest(body, _tools, ct);
+                    result = await UnaiMcpProtocol.HandleRequest(body, _tools, ct, AllowMutatingTools);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception ex)
@@ -240,9 +258,14 @@ namespace UnAI.MCP
             }
         }
 
-        private static void SetCorsHeaders(HttpListenerResponse response)
+        private static void SetCorsHeaders(HttpListenerRequest request, HttpListenerResponse response)
         {
-            response.Headers.Add("Access-Control-Allow-Origin", "*");
+            string origin = request.Headers["Origin"];
+            if (origin != null)
+            {
+                response.Headers.Add("Access-Control-Allow-Origin", origin);
+                response.Headers.Add("Vary", "Origin");
+            }
             response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
             response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
         }

@@ -8,6 +8,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 1. Validate origins before exposing editor tools
 
+**Implemented:** exact origin validation, loopback checks, generated bearer authentication, restricted CORS and default read-only tool exposure. Both MCP entry points expose explicit mutating-tool controls and token copy. The Windows hint now recommends an account-scoped URL reservation. Policy and real HTTP tests exercise authorization, rejection before dispatch and mutating-tool gating.
+
 **Evidence:** [UnaiMcpServer.cs](../Scripts/MCP/UnaiMcpServer.cs), `HandleContext` and `SetCorsHeaders`, accepts requests without checking their origin, advertises wildcard CORS, and has no authentication check. The tool factory includes asset deletion, script modification and C# execution.
 
 **Impact:** a local endpoint exposing these operations needs protection from browser-origin requests. The advertised [MCP 2025-03-26 transport specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) requires origin validation and recommends authentication.

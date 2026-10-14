@@ -15,7 +15,8 @@ namespace UnAI.MCP
         public const string ServerName = "unai-unity";
         public static string ServerVersion => UnaiVersion.Get();
 
-        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, CancellationToken ct)
+        public static async Task<string> HandleRequest(string jsonBody, UnaiToolRegistry tools, CancellationToken ct,
+            bool allowMutatingTools = false)
         {
             JObject request;
             try
@@ -48,8 +49,8 @@ namespace UnAI.MCP
                 {
                     "initialize" => HandleInitialize(id),
                     "ping" => MakeResult(id, new JObject()),
-                    "tools/list" => HandleToolsList(id, tools),
-                    "tools/call" => await HandleToolsCall(id, parameters, tools, ct),
+                    "tools/list" => HandleToolsList(id, tools, allowMutatingTools),
+                    "tools/call" => await HandleToolsCall(id, parameters, tools, ct, allowMutatingTools),
                     _ => MakeError(id, -32601, $"Method not found: {method}")
                 };
             }
@@ -99,12 +100,13 @@ namespace UnAI.MCP
             return MakeResult(id, result);
         }
 
-        private static string HandleToolsList(JToken id, UnaiToolRegistry tools)
+        private static string HandleToolsList(JToken id, UnaiToolRegistry tools, bool allowMutatingTools)
         {
             var toolsArray = new JArray();
 
             foreach (var def in tools.GetAllDefinitions())
             {
+                if (!allowMutatingTools && !def.IsReadOnly) continue;
                 var inputSchema = def.ParametersSchema != null
                     ? def.ParametersSchema.DeepClone() as JObject
                     : new JObject { ["type"] = "object" };
@@ -113,7 +115,8 @@ namespace UnAI.MCP
                 {
                     ["name"] = def.Name,
                     ["description"] = def.Description ?? "",
-                    ["inputSchema"] = inputSchema
+                    ["inputSchema"] = inputSchema,
+                    ["annotations"] = new JObject { ["readOnlyHint"] = def.IsReadOnly }
                 });
             }
 
@@ -123,15 +126,17 @@ namespace UnAI.MCP
         }
 
         private static async Task<string> HandleToolsCall(JToken id, JObject parameters,
-            UnaiToolRegistry tools, CancellationToken ct)
+            UnaiToolRegistry tools, CancellationToken ct, bool allowMutatingTools)
         {
             string toolName = parameters["name"]?.ToString();
             if (string.IsNullOrEmpty(toolName))
                 return MakeError(id, -32602, "Missing required parameter: 'name'");
 
-            var tool = tools.Get(toolName) ?? tools.GetFuzzy(toolName);
+            var tool = tools.Get(toolName);
             if (tool == null)
                 return MakeError(id, -32602, $"Unknown tool: '{toolName}'. Use tools/list to see available tools.");
+            if (!allowMutatingTools && !tool.Definition.IsReadOnly)
+                return MakeError(id, -32602, "Mutating tools are disabled. Enable them explicitly in Unity before calling this tool.");
 
             var arguments = parameters["arguments"] as JObject ?? new JObject();
 
@@ -142,7 +147,7 @@ namespace UnAI.MCP
                 ArgumentsJson = arguments.ToString(Formatting.None)
             };
 
-            Debug.Log($"[UNAI MCP] Calling tool '{toolName}' with args: {call.ArgumentsJson}");
+            Debug.Log($"[UNAI MCP] Calling tool '{toolName}'.");
 
             var toolResult = await tool.ExecuteAsync(call, ct);
 

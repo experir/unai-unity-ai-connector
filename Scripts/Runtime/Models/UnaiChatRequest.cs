@@ -39,6 +39,7 @@ namespace UnAI.Models
             {
                 Name = tool.Name,
                 Description = tool.Description,
+                IsReadOnly = tool.IsReadOnly,
                 ParametersSchema = (Newtonsoft.Json.Linq.JObject)tool.ParametersSchema?.DeepClone()
             });
             return copy;

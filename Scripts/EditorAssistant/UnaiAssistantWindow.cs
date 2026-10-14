@@ -62,6 +62,7 @@ namespace UnAI.Editor.Assistant
         [SerializeField] private bool _mcpFoldout;
         [SerializeField] private int _mcpPort = 3389;
         [SerializeField] private bool _mcpAutoStart;
+        [SerializeField] private bool _mcpAllowMutatingTools;
         private object _mcpServer; // UnaiMcpServer instance (or null if MCP module not present)
         private bool _mcpAvailable = true; // false if MCP assembly not found
 
@@ -1199,10 +1200,16 @@ namespace UnAI.Editor.Assistant
             EditorGUILayout.EndHorizontal();
 
             _mcpAutoStart = EditorGUILayout.Toggle("Auto-start on load", _mcpAutoStart);
+            EditorGUI.BeginDisabledGroup(running);
+            _mcpAllowMutatingTools = EditorGUILayout.Toggle("Allow mutating tools", _mcpAllowMutatingTools);
+            EditorGUI.EndDisabledGroup();
 
             if (running)
             {
                 string url = McpGetString("Url");
+
+                if (GUILayout.Button("Copy MCP Bearer Token", EditorStyles.miniButton))
+                    GUIUtility.systemCopyBuffer = McpGetString("AccessToken");
 
                 // URL copy
                 EditorGUILayout.BeginHorizontal();
@@ -1216,7 +1223,7 @@ namespace UnAI.Editor.Assistant
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.LabelField(
-                    $"Claude Desktop config: {{ \"mcpServers\": {{ \"unity\": {{ \"url\": \"{url}\" }} }} }}",
+                    $"HTTP client URL: {url}. Configure its Authorization bearer header.",
                     _debugStyle);
             }
         }
@@ -1241,6 +1248,7 @@ namespace UnAI.Editor.Assistant
                 }
 
                 var tools = UnaiAssistantToolsFactory.CreateEditorToolRegistry();
+                _mcpServerType.GetProperty("AllowMutatingTools")?.SetValue(_mcpServer, _mcpAllowMutatingTools);
                 var startMethod = _mcpServerType.GetMethod("Start");
                 startMethod?.Invoke(_mcpServer, new object[] { _mcpPort, tools });
                 Repaint();
