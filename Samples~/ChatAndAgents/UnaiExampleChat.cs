@@ -363,7 +363,7 @@ namespace UnAI.Examples
                 "</size>";
             text.color = new Color(0.9f, 0.9f, 0.9f);
             text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = true;
+            text.textWrappingMode = TextWrappingModes.Normal;
         }
 
         private void OnDestroy()
