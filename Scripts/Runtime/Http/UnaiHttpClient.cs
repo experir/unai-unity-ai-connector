@@ -98,16 +98,7 @@ namespace UnAI.Http
         internal static UnaiErrorInfo CreateErrorFromRequest(UnityWebRequest request)
         {
             int statusCode = (int)request.responseCode;
-            var errorType = statusCode switch
-            {
-                401 or 403 => UnaiErrorType.Authentication,
-                429 => UnaiErrorType.RateLimit,
-                400 => UnaiErrorType.InvalidRequest,
-                >= 500 => UnaiErrorType.ServerError,
-                _ => request.result == UnityWebRequest.Result.ConnectionError
-                    ? UnaiErrorType.Network
-                    : UnaiErrorType.Unknown
-            };
+            var errorType = ClassifyError(statusCode, request.result);
 
             // Parse Retry-After header (seconds or HTTP-date)
             float? retryAfter = null;
@@ -135,6 +126,21 @@ namespace UnAI.Http
                 HttpStatusCode = statusCode,
                 RawResponse = request.downloadHandler?.text,
                 RetryAfterSeconds = retryAfter
+            };
+        }
+
+        internal static UnaiErrorType ClassifyError(int statusCode, UnityWebRequest.Result result)
+        {
+            // WebGL can report a synthetic HTTP 500 for failed fetches, including CORS denial.
+            // A failed transport is not a provider HTTP response, regardless of its status placeholder.
+            if (result == UnityWebRequest.Result.ConnectionError) return UnaiErrorType.Network;
+            return statusCode switch
+            {
+                401 or 403 => UnaiErrorType.Authentication,
+                429 => UnaiErrorType.RateLimit,
+                400 => UnaiErrorType.InvalidRequest,
+                >= 500 => UnaiErrorType.ServerError,
+                _ => UnaiErrorType.Unknown
             };
         }
     }

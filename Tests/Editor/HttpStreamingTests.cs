@@ -2,20 +2,34 @@ using System;
 using System.Collections;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnAI.Config;
+using UnAI.Http;
 using UnAI.Models;
 using UnAI.Providers.OpenAICompatible;
 using UnAI.Streaming;
 using UnityEngine.TestTools;
+using UnityEngine.Networking;
 
 namespace UnAI.Tests
 {
     public class HttpStreamingTests
     {
+        [TestCase(500, UnityWebRequest.Result.ConnectionError, UnaiErrorType.Network)]
+        [TestCase(401, UnityWebRequest.Result.ConnectionError, UnaiErrorType.Network)]
+        [TestCase(500, UnityWebRequest.Result.ProtocolError, UnaiErrorType.ServerError)]
+        [TestCase(401, UnityWebRequest.Result.ProtocolError, UnaiErrorType.Authentication)]
+        public void TransportFailuresTakePrecedenceOverPlaceholderHttpStatuses(
+            int statusCode, UnityWebRequest.Result result, UnaiErrorType expected)
+        {
+            var classify = typeof(UnaiHttpClient).GetMethod("ClassifyError", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.AreEqual(expected, classify.Invoke(null, new object[] { statusCode, result }));
+        }
+
         private sealed class Provider : OpenAICompatibleProvider
         {
             public ISseLineParser Parser() => CreateStreamParser();

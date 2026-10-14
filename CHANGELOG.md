@@ -28,6 +28,7 @@ Beta candidate prepared on `main`; no release tag has been published. See [upgra
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- WebGL transport/CORS failures are classified as network errors before Unity's placeholder HTTP status
 - Ollama retains token usage, finish reasons and tool-result names; malformed/error stream payloads fail visibly
 - Cancellation from a stream callback suppresses remaining buffered deltas and completion
 - UI sample uses the current TextMeshPro wrapping API without obsolete API warnings
