@@ -78,6 +78,16 @@ For documentation changes, check local links and code snippets against the sourc
 
 Before a release, verify a clean UPM installation, optional-module removal with dependents, sample dependencies, package/version agreement, and the supported Unity build targets. See the [maintenance review](Docs/maintenance-review.md) for known gaps and prioritized work.
 
+### Reproducible checks
+
+Run `python Tools~/validate_package.py` for package versions, metadata, sample paths and local documentation links.
+
+Create an isolated Unity project with `python Tools~/prepare_unity_project.py PATH_TO_NEW_PROJECT --modules full --samples`. Open it in Unity 6 and run the `UnAI.Tests.Editor` tests in Test Runner. Omit `--samples` to verify the package without imported examples. `--modules core`, `agent`, `assistant` or `mcp` validates the corresponding module combination; only the full project includes tests that depend on all optional modules.
+
+For headless testing, use Unity's `-batchmode -nographics -projectPath PATH -runTests -testPlatform EditMode -testResults results.xml -logFile tests.log` options. For player validation, add `-quit -executeMethod UnaiValidationBuild.Build` and choose `-buildTarget StandaloneWindows64` or `WebGL`. The generated build helper creates a scene with `UnaiManager` and does not call a cloud provider.
+
+GitHub Actions runs the Python checks on pushes and pull requests. Unity tests target 6000.0.68f1 and 6000.3.23f1; player jobs cover Core/full module sets with sample imports on Windows and WebGL. Set up the Unity license secrets documented by [GameCI](https://game.ci/docs/github/test-runner/) and set the repository variable `UNITY_CI_ENABLED` to `true` to enable licensed jobs. They remain skipped until enabled; no license is needed for metadata checks.
+
 ## Reporting Bugs
 
 Please include:

@@ -1,6 +1,6 @@
 # UNAI maintenance review
 
-Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package version `1.0.0`. Findings below come from source inspection. No live provider calls, Unity player builds, or MCP client sessions were run as part of this documentation refresh.
+Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package version `1.0.0`. Evidence below records the initial source findings. Implementation notes describe the completed refresh. Validation now includes Unity 6000.3.23f1 regression tests, no-reload Play Mode, isolated module combinations, imported samples and player builds. Live cloud provider calls and third-party GUI MCP clients remain unverified.
 
 [Back to README](../README.md)
 
@@ -129,11 +129,10 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 - Added key handling, main-thread usage, cancellation, diagnostics and platform caveats tied to the implementation.
 - Updated contribution instructions and added an Unreleased changelog section.
 
-## Suggested release sequence
+## Validation and release follow-up
 
-1. Merge the documentation refresh after reviewing the local changes.
-2. Fix items 1–6 with targeted regression tests, then fix sample packaging and MCP conformance.
-3. Verify provider capabilities and update model suggestions with dated evidence.
-4. Add Unity CI and publish a versioned release with the actual tested Unity/provider/client matrix.
+See [Refresh validation](validation.md) for the test/build matrix and explicit limits of the checks.
 
-The package version remains `1.0.0` during this documentation refresh. A future website can reuse these versioned guides when new pages are available.
+The refresh has been implemented in focused commits. The package version remains `1.0.0`; no release tag has been published. Regression fixtures verify the adapters without spending cloud-provider credits. Before a tagged release, run the enabled Unity CI matrix on the minimum supported editor, verify live provider accounts and named GUI MCP clients, and publish the tested compatibility matrix.
+
+Unity CI needs repository license configuration and `UNITY_CI_ENABLED=true`; metadata checks run without a license. The README logo asset lives under `Docs/assets~` so Unity does not import documentation artwork or require an SVG importer. A future website can reuse the versioned guides when pages are available.

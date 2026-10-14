@@ -112,3 +112,5 @@ InitTestScene*.unity*
 .vscode/
 /.claude/
 *.slnx
+/UnityValidation/
+/artifacts/

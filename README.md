@@ -1,7 +1,7 @@
 # UNAI - Universal AI Connector for Unity
 
 <p align="center">
-  <img src="Docs/assets/unai-logo.svg" alt="UNAI logo on a rounded dark square" width="128" height="128"/>
+  <img src="Docs/assets~/unai-logo.svg" alt="UNAI logo on a rounded dark square" width="128" height="128"/>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -475,6 +475,7 @@ Documentation lives in this repository and is versioned with the package.
 | [MCP Server](Docs/mcp.md) | Local HTTP client setup, registration and protocol limitations |
 | [Troubleshooting](Docs/troubleshooting.md) | Common errors, platform notes and diagnostics |
 | [Maintenance review](Docs/maintenance-review.md) | Prioritized findings and proposed refresh work |
+| [Refresh validation](Docs/validation.md) | Tested Unity version, regression coverage, builds and remaining verification |
 
 ## Contributing
 

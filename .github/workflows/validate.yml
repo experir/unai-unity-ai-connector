@@ -1,0 +1,46 @@
+name: Validate package
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python Tools~/validate_package.py
+  unity:
+    # Unity requires licensed CI credentials. Enable the repository variable after configuring them.
+    if: vars.UNITY_CI_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        unity: ['6000.0.68f1', '6000.3.23f1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python Tools~/prepare_unity_project.py UnityValidation
+      - uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: UnityValidation
+          unityVersion: ${{ matrix.unity }}
+          testMode: editmode
+          artifactsPath: artifacts
+          coverageEnabled: false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unity-${{ matrix.unity }}
+          path: artifacts
