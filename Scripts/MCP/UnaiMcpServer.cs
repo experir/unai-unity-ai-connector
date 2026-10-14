@@ -203,10 +203,13 @@ namespace UnAI.MCP
                 Session session;
                 if (initialize)
                 {
-                    if (_sessions.Count >= 64) { Error(response, 429, "Too many sessions."); return; }
                     sessionId = Guid.NewGuid().ToString("N");
                     session = new Session { Version = UnaiMcpProtocol.SelectVersion((message["params"] as JObject)?["protocolVersion"]?.ToString()) };
-                    if (!_sessions.TryAdd(sessionId, session)) { Error(response, 503, "Could not initialize session."); return; }
+                    lock (_sessions)
+                    {
+                        if (_sessions.Count >= 64) { Error(response, 429, "Too many sessions."); return; }
+                        if (!_sessions.TryAdd(sessionId, session)) { Error(response, 503, "Could not initialize session."); return; }
+                    }
                 }
                 else
                 {

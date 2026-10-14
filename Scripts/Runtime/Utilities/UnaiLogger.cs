@@ -27,6 +27,15 @@ namespace UnAI.Utilities
             "password", "authorization", "signature", "sig", "x-goog-api-key", "x-api-key"
         };
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnLoad()
+        {
+            VerboseEnabled = false;
+            RawJsonLoggingEnabled = false;
+            _logFilePath = null;
+            lock (Secrets) Secrets.Clear();
+        }
+
         public static void RegisterSecret(string secret)
         {
             if (string.IsNullOrEmpty(secret)) return;

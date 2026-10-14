@@ -2147,7 +2147,12 @@ namespace UnAI.Editor.Assistant
             sb.AppendLine($"  Bounce threshold: {Physics.bounceThreshold}");
             sb.AppendLine($"  Default contact offset: {Physics.defaultContactOffset}");
             sb.AppendLine($"  Sleep threshold: {Physics.sleepThreshold}");
-            sb.AppendLine($"  Auto-sync transforms: {Physics.autoSyncTransforms}");
+            var physicsAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/DynamicsManager.asset").FirstOrDefault();
+            if (physicsAsset != null)
+            {
+                var autoSync = new SerializedObject(physicsAsset).FindProperty("m_AutoSyncTransforms");
+                if (autoSync != null) sb.AppendLine($"  Auto-sync transforms: {autoSync.boolValue}");
+            }
 
             // Layer collision matrix — show which layers collide
             sb.AppendLine("  Layer collision matrix (non-default):");

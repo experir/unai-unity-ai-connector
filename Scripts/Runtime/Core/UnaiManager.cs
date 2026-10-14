@@ -46,7 +46,7 @@ namespace UnAI.Core
             _config = config;
             Cache.Clear();
             UnaiLogger.VerboseEnabled = _config.DebugLogging;
-            UnaiProviderRegistry.InitializeBuiltInProviders(_config);
+            UnaiProviderRegistry.InitializeBuiltInProviders(_config, force: true);
             _activeProviderId = _config.DefaultProviderId;
         }
 
@@ -62,6 +62,19 @@ namespace UnAI.Core
             // Config may be null if Initialize() will be called from code
             if (_config != null)
                 Initialize(_config);
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSingleton() => Instance = null;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RestoreExistingManager()
+        {
+            // With scene and domain reload disabled, an existing component may not receive Awake again.
+            var manager = FindFirstObjectByType<UnaiManager>();
+            if (manager == null) return;
+            Instance = manager;
+            if (manager._config != null) manager.Initialize(manager._config);
         }
 
         public void SetActiveProvider(string providerId)

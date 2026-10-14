@@ -23,7 +23,7 @@ namespace UnAI.Core
 
         protected UnaiProviderConfig Config { get; private set; }
 
-        public bool IsConfigured => Config != null && ValidateConfig();
+        public bool IsConfigured => Config != null && Config.Enabled && ValidateConfig();
 
         public virtual void Initialize(UnaiProviderConfig config)
         {

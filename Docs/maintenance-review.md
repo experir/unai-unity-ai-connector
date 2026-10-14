@@ -112,6 +112,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 10. Add Unity checks and reliable package lifecycle handling
 
+**Implemented and verified:** package metadata uses Unity package APIs, built-in provider configurations can be rebound, and static registry/logging/singleton state resets at the runtime subsystem boundary. A real Play Mode test with both domain and scene reload disabled verifies manager restoration and cache reset. Version and reinitialization tests pass. Reusable validation projects and CI checks support the package, samples and module combinations. A cloud Unity license is required to enable the Unity CI jobs.
+
 **Evidence:** there are no checked-in tests or CI workflows. [UnaiVersion.cs](../Scripts/Runtime/UnaiVersion.cs) finds `package.json` under a fixed `Assets/unai-unity-ai-connector` path, despite the recommended UPM installation. [UnaiProviderRegistry.cs](../Scripts/Runtime/Core/UnaiProviderRegistry.cs) ignores later configurations after `_initialized` becomes true. Static registry state also needs testing with domain reload disabled.
 
 **Proposed fix:** resolve package metadata via Unity's package APIs, keep the runtime constant in sync through an actual release check, define reinitialization/reset semantics, and add Unity EditMode coverage for parsers, serialization, cache, fallback and module compilation. Add a clean install and player build check before releasing.

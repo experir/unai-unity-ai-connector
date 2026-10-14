@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- UPM version lookup, provider reinitialization and static state with domain/scene reload disabled
 - MCP version negotiation, sessions, 202 acknowledgements, request limits and cancellation/shutdown handling
 - OpenAI completion limits, compatible endpoint normalization and optional streaming usage
 - Gemini tool signature/history preservation and current Claude/Gemini model suggestions

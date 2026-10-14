@@ -6,59 +6,36 @@ namespace UnAI
     /// </summary>
     public static class UnaiVersion
     {
-        /// <summary>Baked version — keep in sync with package.json (automated by CI or the Hub window).</summary>
+        /// <summary>Baked version — checked against package.json by CI.</summary>
         public const string Current = "1.0.0";
 
 #if UNITY_EDITOR
-        private static string _resolved;
-
         /// <summary>
         /// Returns the version read from package.json when running in the editor,
         /// or the baked <see cref="Current"/> constant at runtime.
         /// </summary>
         public static string Get()
         {
-            if (_resolved != null) return _resolved;
-
-            string packageJsonPath = GetPackageJsonPath();
-            if (packageJsonPath != null && System.IO.File.Exists(packageJsonPath))
+            var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(UnaiVersion).Assembly);
+            if (package != null && !string.IsNullOrEmpty(package.version)) return package.version;
+            // Also support a manual copy anywhere under Assets.
+            foreach (string guid in UnityEditor.AssetDatabase.FindAssets("UnaiVersion t:MonoScript"))
             {
-                string json = System.IO.File.ReadAllText(packageJsonPath);
-                // Tiny extraction — avoids pulling in Newtonsoft just for one field.
-                const string key = "\"version\"";
-                int idx = json.IndexOf(key);
-                if (idx >= 0)
+                string script = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                var folder = new System.IO.DirectoryInfo(System.IO.Path.GetDirectoryName(script));
+                while (folder != null && folder.FullName.StartsWith(System.IO.Path.GetFullPath("Assets"), System.StringComparison.OrdinalIgnoreCase))
                 {
-                    int colon = json.IndexOf(':', idx + key.Length);
-                    int open = json.IndexOf('"', colon + 1);
-                    int close = json.IndexOf('"', open + 1);
-                    if (open >= 0 && close > open)
+                    string manifest = System.IO.Path.Combine(folder.FullName, "package.json");
+                    if (System.IO.File.Exists(manifest))
                     {
-                        _resolved = json.Substring(open + 1, close - open - 1);
-                        return _resolved;
+                        var data = Newtonsoft.Json.Linq.JObject.Parse(System.IO.File.ReadAllText(manifest));
+                        if (data["name"]?.ToString() == "com.unai.universal-ai-connector")
+                            return data["version"]?.ToString() ?? Current;
                     }
+                    folder = folder.Parent;
                 }
             }
-
-            _resolved = Current;
-            return _resolved;
-        }
-
-        private static string GetPackageJsonPath()
-        {
-            // Try to find it relative to this script's assembly location.
-            string[] guids = UnityEditor.AssetDatabase.FindAssets("package t:TextAsset",
-                new[] { "Assets/unai-unity-ai-connector" });
-            foreach (string guid in guids)
-            {
-                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                if (path.EndsWith("package.json"))
-                    return path;
-            }
-
-            // Fallback — common path
-            string fallback = "Assets/unai-unity-ai-connector/package.json";
-            return System.IO.File.Exists(fallback) ? fallback : null;
+            return Current;
         }
 #else
         /// <summary>

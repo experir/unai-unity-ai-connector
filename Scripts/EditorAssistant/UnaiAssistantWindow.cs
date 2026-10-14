@@ -125,6 +125,7 @@ namespace UnAI.Editor.Assistant
         private void RefreshProviderList()
         {
             if (_config == null) return;
+            UnaiProviderRegistry.InitializeBuiltInProviders(_config, force: true);
 
             var providers = _config.AllProviders()
                 .Where(p => p.Enabled)

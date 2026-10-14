@@ -18,7 +18,8 @@ namespace UnAI.Core
     {
         private static readonly Dictionary<string, IUnaiProvider> _providers = new();
         private static readonly Dictionary<string, PendingProvider> _pending = new();
-        private static bool _initialized;
+        private static UnaiGlobalConfig _initializedConfig;
+        private static readonly string[] BuiltInIds = { "openai", "anthropic", "gemini", "mistral", "cohere", "ollama", "lmstudio", "llamacpp", "openai-compatible" };
         public static int Revision { get; private set; }
 
         public static void Register(IUnaiProvider provider)
@@ -52,12 +53,14 @@ namespace UnAI.Core
         }
 
         public static bool Has(string providerId) =>
-            _providers.ContainsKey(providerId) || _pending.ContainsKey(providerId);
+            !string.IsNullOrEmpty(providerId) && (_providers.ContainsKey(providerId) || _pending.ContainsKey(providerId));
 
         public static bool Unregister(string providerId)
         {
-            _pending.Remove(providerId);
-            return _providers.Remove(providerId);
+            if (string.IsNullOrEmpty(providerId)) return false;
+            bool removed = _pending.Remove(providerId) | _providers.Remove(providerId);
+            if (removed) Revision++;
+            return removed;
         }
 
         public static void Clear()
@@ -65,12 +68,17 @@ namespace UnAI.Core
             Revision++;
             _providers.Clear();
             _pending.Clear();
-            _initialized = false;
+            _initializedConfig = null;
         }
 
-        public static void InitializeBuiltInProviders(UnaiGlobalConfig config)
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnLoad() => Clear();
+
+        public static void InitializeBuiltInProviders(UnaiGlobalConfig config, bool force = false)
         {
-            if (_initialized) return;
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            if (!force && _initializedConfig == config) return;
+            foreach (string id in BuiltInIds) Unregister(id);
 
             RegisterLazy<OpenAIProvider>(config.OpenAI);
             RegisterLazy<AnthropicProvider>(config.Anthropic);
@@ -82,7 +90,7 @@ namespace UnAI.Core
             RegisterLazy<LlamaCppProvider>(config.LlamaCpp);
             RegisterLazy<OpenAICompatibleProvider>(config.OpenAICompatible);
 
-            _initialized = true;
+            _initializedConfig = config;
         }
 
         /// <summary>
@@ -92,7 +100,10 @@ namespace UnAI.Core
         public static void RegisterLazy<T>(UnaiProviderConfig config) where T : IUnaiProvider, new()
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
+            if (string.IsNullOrEmpty(config.ProviderId)) throw new ArgumentException("A provider ID is required.", nameof(config));
             Revision++;
+            _providers.Remove(config.ProviderId);
+            _pending.Remove(config.ProviderId);
             if (!config.Enabled) return;
             _pending[config.ProviderId] = new PendingProvider
             {
@@ -116,6 +127,8 @@ namespace UnAI.Core
             try
             {
                 var provider = pending.Factory();
+                if (provider.ProviderId != pending.Config.ProviderId)
+                    throw new ArgumentException($"Config ID '{pending.Config.ProviderId}' must match adapter ID '{provider.ProviderId}'.");
                 provider.Initialize(pending.Config);
                 _providers[provider.ProviderId] = provider;
                 _pending.Remove(provider.ProviderId);
