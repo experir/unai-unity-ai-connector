@@ -41,7 +41,7 @@ Client cancellation is scoped to its session through `notifications/cancelled` a
 
 Origin validation and bearer authentication run before dispatch. Native local clients may omit Origin, but still need the token; browsers must use the exact server origin. CORS is restricted. The server binds to `localhost` and rejects non-loopback peers. Custom tools are not exposed as read-only unless explicitly marked.
 
-Unity tests exercise initialize/list/call/cancel exchanges with .NET HTTP and UnityWebRequest clients, including version negotiation, notification status, authorization, deadlines and request-size limits. Independent CLI clients were also exercised as described above; Claude Code/Desktop and Cursor GUI sessions remain unverified. The server supports the two documented 2025 protocol revisions, not the 2026 revision. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [maintenance review](maintenance-review.md).
+Unity tests exercise initialize/list/call/cancel exchanges with .NET HTTP and UnityWebRequest clients, including version negotiation, notification status, authorization, deadlines and request-size limits. Independent CLI clients and the [Inspector browser UI](browser-validation.md#mcp-inspector-browser-ui) were exercised; Claude Code/Desktop and Cursor GUI sessions remain unverified. The server supports the two documented 2025 protocol revisions, not the 2026 revision. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [maintenance review](maintenance-review.md).
 
 ## Troubleshooting
 

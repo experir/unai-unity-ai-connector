@@ -378,7 +378,7 @@ Use the URL shown in the server window. For Claude Code, HTTP registration uses:
 claude mcp add --transport http unity http://localhost:3389/mcp --header "Authorization: Bearer <token>"
 ```
 
-See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. Claude Code's HTTP health check, MCP Inspector tool calls and official SDK integration probes have passed locally; see [tested clients and reproduction steps](Docs/live-validation.md#mcp-clients). GUI client sessions remain unverified. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+See [MCP setup](Docs/mcp.md) for client guidance and the implementation's current limitations. Claude Code's HTTP health check, MCP Inspector CLI/browser tool calls and official SDK integration probes have passed locally; see [tested clients and reproduction steps](Docs/live-validation.md#mcp-clients). Claude Desktop and Cursor GUI sessions remain unverified. The command follows the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
 
 ### How it works
 
@@ -465,7 +465,7 @@ This table describes the implementation, not a tested compatibility matrix. See 
 
 Documentation lives in this repository and is versioned with the package.
 
-The refresh is prepared as **1.1.0-beta.1** on `main`. It is a beta candidate, not a tagged release. Existing users should follow the [upgrade instructions](Docs/upgrading.md), particularly for samples and MCP authentication.
+The refresh is **1.1.0-beta.1**, a [beta prerelease](https://github.com/experir/unai-unity-ai-connector/releases/tag/v1.1.0-beta.1). Unity 6000.3.23f1 and Chrome/Windows browser checks pass; **Unity 6000.0 remains unverified**. Existing users should follow the [upgrade instructions](Docs/upgrading.md), particularly for samples and MCP authentication.
 
 | Guide | Description |
 |-------|-------------|
@@ -479,6 +479,7 @@ The refresh is prepared as **1.1.0-beta.1** on `main`. It is a beta candidate, n
 | [Maintenance review](Docs/maintenance-review.md) | Prioritized findings and proposed refresh work |
 | [Refresh validation](Docs/validation.md) | Tested Unity version, regression coverage, builds and remaining verification |
 | [Live integration checks](Docs/live-validation.md) | Tested MCP clients and an explicit local/cloud provider runner |
+| [Browser validation](Docs/browser-validation.md) | WebGL networking/streaming and MCP Inspector browser UI checks |
 | [Upgrading to the beta](Docs/upgrading.md) | Sample migration, MCP authentication and release status |
 
 ## Contributing

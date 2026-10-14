@@ -2,11 +2,17 @@
 
 [Back to README](../README.md)
 
-The refresh is prepared as **1.1.0-beta.1** on `main`. No release tag or GitHub release has been published. This is a beta candidate for evaluation in a copy of your Unity project. Unity 6000.3.23f1 on Windows has been tested; the minimum supported 6000.0 editor run is still pending. See the [validation matrix](validation.md) and [changelog](../CHANGELOG.md).
+This guide covers **1.1.0-beta.1**, a [beta prerelease](https://github.com/experir/unai-unity-ai-connector/releases/tag/v1.1.0-beta.1) for evaluation in a copy of your Unity project. Unity 6000.3.23f1 on Windows and Chrome browser checks have passed; **Unity 6000.0 is unverified**. See the [validation matrix](validation.md), [browser checks](browser-validation.md) and [changelog](../CHANGELOG.md).
 
 ## Package and samples
 
 Update your embedded checkout or the Git package dependency through Unity Package Manager. Remove any duplicate manual copy of UNAI when switching to UPM: importing both copies produces duplicate assemblies and GUIDs. Keep application configuration assets and your own scripts outside the package.
+
+For a reproducible beta install, use this Git URL in Package Manager:
+
+```text
+https://github.com/experir/unai-unity-ai-connector.git#v1.1.0-beta.1
+```
 
 Examples are now optional UPM samples under `Samples~`. They are not automatically imported with the package. If you used the old `Examples` folder, preserve your modifications and scene references before replacing it, then import the appropriate sample from Package Manager:
 
@@ -46,6 +52,6 @@ OpenAI now uses `max_completion_tokens`; generic compatible services retain `max
 
 ## Before a stable release
 
-The beta has local regression, build, MCP CLI and Ollama evidence. Cloud-provider checks were skipped by request, and no GUI client session was exercised. The prepared [live runner](live-validation.md#provider-runner) is available when credentials and a spending limit are authorized.
+The beta has local regression, build, WebGL browser, MCP CLI/Inspector web UI and Ollama evidence. Cloud-provider checks were skipped by request. Claude Desktop and Cursor GUI sessions remain unverified. The prepared [live runner](live-validation.md#provider-runner) is available when credentials and a spending limit are authorized.
 
 The minimum Unity 6000.0 run and licensed Unity CI still need completion. The installed machine only has a complete 6000.3.23f1 editor. [Official release metadata](https://services.api.unity.com/unity/editor/release/v1/releases?version=6000.0.68f1&platform=WINDOWS&architecture=X86_64) lists a 4.1 GB download and 7.8 GB installed size for 6000.0.68f1, before validation-project caches; another editor was not installed with approximately 6 GB free. Configure the repository's Unity license credentials and `UNITY_CI_ENABLED=true` to run the existing CI matrix, or install the minimum editor when space is available. Metadata CI runs without a license.

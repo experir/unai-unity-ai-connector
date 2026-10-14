@@ -114,3 +114,4 @@ InitTestScene*.unity*
 *.slnx
 /UnityValidation/
 /artifacts/
+/Tools~/__pycache__/

@@ -12,9 +12,12 @@ On 2026-10-14, Unity 6000.3.23f1 on Windows passed:
 |---|---|
 | Claude Code 2.1.34 | HTTP connection health check, including initialization and bearer authentication; no model session was invoked |
 | MCP Inspector 2.11.0 CLI | Called the built-in `get_selection` tool successfully |
+| MCP Inspector 2.11.0 browser UI | Connected, displayed read-only tools, called `get_selection`, cancelled a delayed probe, and called a built-in tool again |
 | Official MCP TypeScript SDK 1.32.1 | Tool discovery/calls, invalid-token rejection, mutation gating, cancellation, and reconnection after script recompilation with a replacement token |
 
 These results do not establish Cursor or Claude Desktop GUI compatibility. The server negotiates the supported 2025 protocol revisions; it does not implement the 2026 protocol. The Inspector check used its `legacy` protocol era. See the [official Inspector guide](https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/cli) and [Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+
+The compiled WebGL player also passed eight Chrome runtime checks against local Ollama and controlled fixtures; see [browser validation](browser-validation.md).
 
 To reproduce, create a full validation project using [CONTRIBUTING.md](../CONTRIBUTING.md#reproducible-checks). Copy `Tools~/UnaiIntegrationServer.cs` to its `Assets/Editor/` directory. Create a separate temporary client directory outside the repository, and copy `Tools~/mcp_smoke_test.mjs` there. In that client directory, using Node 22.19.0 or newer:
 
