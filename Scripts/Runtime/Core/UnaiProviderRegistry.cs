@@ -19,15 +19,19 @@ namespace UnAI.Core
         private static readonly Dictionary<string, IUnaiProvider> _providers = new();
         private static readonly Dictionary<string, PendingProvider> _pending = new();
         private static bool _initialized;
+        public static int Revision { get; private set; }
 
         public static void Register(IUnaiProvider provider)
         {
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
+            Revision++;
             _providers[provider.ProviderId] = provider;
             _pending.Remove(provider.ProviderId);
         }
 
         public static IUnaiProvider Get(string providerId)
         {
+            if (string.IsNullOrEmpty(providerId)) return null;
             if (_providers.TryGetValue(providerId, out var provider))
                 return provider;
 
@@ -58,6 +62,7 @@ namespace UnAI.Core
 
         public static void Clear()
         {
+            Revision++;
             _providers.Clear();
             _pending.Clear();
             _initialized = false;
@@ -86,6 +91,8 @@ namespace UnAI.Core
         /// </summary>
         public static void RegisterLazy<T>(UnaiProviderConfig config) where T : IUnaiProvider, new()
         {
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            Revision++;
             if (!config.Enabled) return;
             _pending[config.ProviderId] = new PendingProvider
             {

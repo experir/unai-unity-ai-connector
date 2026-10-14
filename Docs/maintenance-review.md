@@ -42,6 +42,8 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 4. Hash the complete effective request for caching
 
+**Implemented:** canonical structured keys include resolved models, messages, tools and provider context; lookups and insertion share an identity. Cached response snapshots are independent. Regression tests cover the delimiter collision, tool metadata, property order, implicit-model hits, endpoint changes and LRU eviction.
+
 **Evidence:** [UnaiResponseCache.cs](../Scripts/Runtime/Utilities/UnaiResponseCache.cs), `BuildKey`, includes only provider ID, model, message role/content and options. It omits tool definitions, tool calls and tool result IDs/names. Its message serialization uses unescaped delimiters. The manager looks up the key before model resolution and stores it afterward.
 
 **Impact:** different tool-bearing requests can share a cached result. A request with no model can miss the cache because its lookup and stored model fields differ. Different message lists can also produce the same delimiter string: one user message `a;User:b` collides with two user messages `a` and `b`.

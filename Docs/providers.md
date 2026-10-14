@@ -61,4 +61,4 @@ The shared OpenAI-compatible serializer currently maps `MaxTokens` to `max_token
 
 Requests with `UseCache = true` opt into the manager's non-streaming response cache. Streaming responses are not cached.
 
-Fallback uses an independent request per provider. An explicit model ID applies to the primary provider only; backups use their own configured defaults. The cache key still omits tool data; see the [maintenance review](maintenance-review.md).
+Fallback uses an independent request per provider. An explicit model ID applies to the primary provider only; backups use their own configured defaults. Cache identity includes the resolved model, full message/tool data, endpoint, credentials and registry revision. Cached responses are copied on insertion and retrieval.

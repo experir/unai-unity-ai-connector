@@ -18,6 +18,7 @@ namespace UnAI.Tests
             public string ProviderId { get; set; }
             public bool Fail;
             public string SeenModel;
+            public int Calls;
             public bool IsConfigured => true;
             public string DisplayName => ProviderId;
             public bool SupportsToolCalling => true;
@@ -25,6 +26,7 @@ namespace UnAI.Tests
             public void Initialize(UnaiProviderConfig config) { }
             public Task<UnaiChatResponse> ChatAsync(UnaiChatRequest request, CancellationToken cancellationToken = default)
             {
+                Calls++;
                 SeenModel = request.Model;
                 request.Messages[0].Content = "provider changed snapshot";
                 if (Fail) throw new UnaiRequestException(new UnaiErrorInfo { ErrorType = UnaiErrorType.Network });
@@ -67,6 +69,35 @@ namespace UnAI.Tests
                 Assert.AreEqual(model, request.Model);
                 Assert.IsFalse(request.Stream);
                 Assert.AreEqual("original", request.Messages[0].Content);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                UnityEngine.Object.DestroyImmediate(config);
+                UnaiProviderRegistry.Clear();
+            }
+        }
+
+        [Test]
+        public async Task ImplicitModelCachesAndEndpointChangesInvalidate()
+        {
+            var config = ScriptableObject.CreateInstance<UnaiGlobalConfig>();
+            var go = new GameObject();
+            try
+            {
+                UnaiProviderRegistry.Clear();
+                var manager = go.AddComponent<UnaiManager>();
+                manager.Initialize(config);
+                var provider = new Provider { ProviderId = "openai" };
+                UnaiProviderRegistry.Register(provider);
+                var request = new UnaiChatRequest { UseCache = true, Messages = new() { UnaiChatMessage.User("hello") } };
+                await manager.ChatAsync(request);
+                await manager.ChatAsync(request);
+                Assert.AreEqual(1, provider.Calls);
+                config.OpenAI.BaseUrl = "https://different.example";
+                await manager.ChatAsync(request);
+                Assert.AreEqual(2, provider.Calls);
+                Assert.IsNull(request.Model);
             }
             finally
             {

@@ -84,17 +84,6 @@ namespace UnAI.Core
             var provider = RequireActiveProvider();
             request = request.Clone();
 
-            // Cache check (before fallback — a cache hit skips everything)
-            if (request.UseCache)
-            {
-                string key = UnaiResponseCache.BuildKey(provider.ProviderId, request);
-                if (Cache.TryGet(key, out var cached))
-                {
-                    UnaiLogger.LogVerbose($"[UNAI] Cache hit for request (key={key[..8]}...)");
-                    return cached;
-                }
-            }
-
             // Try active provider, then fallbacks
             var providersToTry = BuildProviderChain(provider);
 
@@ -103,16 +92,17 @@ namespace UnAI.Core
             {
                 ct.ThrowIfCancellationRequested();
 
+                var attemptRequest = CreateProviderRequest(request, p, p != provider);
+                string cacheKey = request.UseCache
+                    ? UnaiResponseCache.BuildKey(p.ProviderId, attemptRequest, GetCacheContext(p.ProviderId)) : null;
+                if (cacheKey != null && Cache.TryGet(cacheKey, out var cached))
+                    return cached;
+
                 try
                 {
-                    var attemptRequest = CreateProviderRequest(request, p, p != provider);
                     var response = await p.ChatAsync(attemptRequest, ct);
 
-                    if (request.UseCache)
-                    {
-                        string key = UnaiResponseCache.BuildKey(p.ProviderId, request);
-                        Cache.Put(key, response);
-                    }
+                    if (cacheKey != null) Cache.Put(cacheKey, response);
 
                     return response;
                 }
@@ -226,6 +216,18 @@ namespace UnAI.Core
             if (provider == null || !provider.IsConfigured)
                 throw new InvalidOperationException("UNAI has no configured active provider. Initialize UnaiManager with a config and enable its selected provider.");
             return provider;
+        }
+
+        private string GetCacheContext(string providerId)
+        {
+            var config = _config?.GetProviderConfig(providerId);
+            return Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                Revision = UnaiProviderRegistry.Revision,
+                BaseUrl = config?.BaseUrl,
+                ApiKey = config?.ResolvedApiKey,
+                Headers = config?.CustomHeaders
+            });
         }
 
         private UnaiChatRequest CreateProviderRequest(UnaiChatRequest request, IUnaiProvider provider, bool isFallback)

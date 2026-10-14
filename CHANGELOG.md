@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contribution setup and validation instructions
 
 ### Fixed
+- Cache identity includes complete resolved requests and provider context; cached responses are isolated
 - Provider fallback uses independent request snapshots and each backup's default model
 - Streaming UTF-8 decoding preserves split accented characters, CJK and emoji
 
@@ -37,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Setup wizard (Window > UnAI > Setup Wizard)
 - Runtime provider switching
 - CancellationToken support for aborting requests
-- **Hub window** — central entry point showing all modules, install status, and version (`Window > UnAI > Hub`)
-- **UnaiVersion** — single source of truth for package version (reads `package.json`)
+- **Hub window** â€” central entry point showing all modules, install status, and version (`Window > UnAI > Hub`)
+- **UnaiVersion** â€” single source of truth for package version (reads `package.json`)
 - CONTRIBUTING.md, CODE_OF_CONDUCT.md, and GitHub issue/PR templates
 - Logo in README and Hub window
 - GitHub badges (license, Unity version, release, stars, issues, PRs welcome)
@@ -46,4 +47,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - CS0618 warnings for obsolete `PlayerSettings.GetScriptingBackend` / `GetApiCompatibilityLevel` APIs (now using `NamedBuildTarget`)
 - CS0414 warnings for unused fields in `UnaiAssistantWindow`
-- Removed redundant "Create Global Config" menu item (use Hub → Core instead)
+- Removed redundant "Create Global Config" menu item (use Hub â†’ Core instead)
