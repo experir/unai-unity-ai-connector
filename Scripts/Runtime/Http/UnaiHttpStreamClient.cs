@@ -66,6 +66,7 @@ namespace UnAI.Http
             var downloadHandler = new UnaiStreamingDownloadHandler(
                 onLineReceived: line =>
                 {
+                    if (cancellationToken.IsCancellationRequested) return;
                     var delta = lineParser.ProcessLine(line);
                     if (delta != null)
                     {
@@ -76,6 +77,7 @@ namespace UnAI.Http
                 },
                 onComplete: () =>
                 {
+                    if (cancellationToken.IsCancellationRequested) return;
                     if (lineParser is IUnaiStreamCompletionParser completionParser)
                     {
                         var delta = completionParser.Complete();
@@ -108,6 +110,14 @@ namespace UnAI.Http
                     yield break;
                 }
                 yield return null;
+            }
+
+            // A delta callback can cancel after the whole HTTP response has already arrived.
+            // Honor that cancellation before delivering completion, including buffered responses.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled();
+                yield break;
             }
 
             if (downloadHandler.ProcessingError != null)

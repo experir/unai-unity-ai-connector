@@ -107,6 +107,29 @@ namespace UnAI.Tests
         }
 
         [UnityTest]
+        public IEnumerator CancellationFromDeltaDoesNotCompleteBufferedResponse()
+        {
+            using var listener = Listen(out string url);
+            var provider = new Provider();
+            provider.Initialize(new UnaiProviderConfig { BaseUrl = url, DefaultModel = "test", MaxRetries = 0 });
+            var server = Reply(listener,
+                "data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n" +
+                "data: {\"choices\":[{\"delta\":{\"content\":\"second\"}}]}\n\n" +
+                "data: [DONE]\n\n");
+            using var cts = new CancellationTokenSource();
+            int deltas = 0;
+            bool completed = false;
+            var task = provider.ChatStreamAsync(new UnaiChatRequest { Messages = new() { UnaiChatMessage.User("hello") } },
+                _ => { deltas++; cts.Cancel(); }, _ => completed = true, cancellationToken: cts.Token);
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (!task.IsCompleted && DateTime.UtcNow < until) yield return null;
+            Assert.IsTrue(task.IsCanceled);
+            Assert.IsFalse(completed);
+            Assert.AreEqual(1, deltas, "Do not deliver more buffered deltas after cancellation.");
+            yield return Wait(server);
+        }
+
+        [UnityTest]
         public IEnumerator PartialOutputIsNotAutomaticallyRetried()
         {
             using var listener = Listen(out string url);
