@@ -30,5 +30,16 @@
     "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.2"
     },
-    "samples": []
+    "samples": [
+        {
+            "displayName": "Minimal Runtime Chat",
+            "description": "A chat component with no UI or Agent dependencies. Assign a UnaiGlobalConfig and add the component to a scene.",
+            "path": "Samples~/MinimalChat"
+        },
+        {
+            "displayName": "Chat UI and Agents",
+            "description": "Chat demo scene and agent tools. Requires the Agent module and com.unity.ugui 2.0.0 (Unity UI and TextMeshPro).",
+            "path": "Samples~/ChatAndAgents"
+        }
+    ]
 }

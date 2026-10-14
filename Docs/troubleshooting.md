@@ -11,7 +11,7 @@ The HTTP layer starts Unity coroutines. Invoke requests from Unity's main thread
 | Symptom | What to check |
 |---|---|
 | Missing `Newtonsoft.Json` | Install `com.unity.nuget.newtonsoft-json` 3.2.2 through Package Manager; match `package.json` |
-| Missing TextMeshPro/UI or `UnAI.Agent` in examples | `Examples/UnAI.Examples.asmdef` references `Unity.TextMeshPro` and `UnAI.Agent`; install the example dependencies, or remove `Examples/` and its `.meta` in an editable copy |
+| Missing TextMeshPro/UI or `UnAI.Agent` in examples | The optional UI sample requires `com.unity.ugui` 2.0.0 and Agent; install its dependencies or use Minimal Runtime Chat |
 | `UnaiManager.Instance` is null | Add a manager to the loaded scene; wait for its `Awake` before calling it |
 | Provider is null or cannot send requests | Initialize the registry, enable the provider, check its ID and base URL, and assign the config |
 | 401 / 403 | Check the resolved key and account access; environment variables take precedence over the asset field |

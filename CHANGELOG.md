@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optional UPM samples, including minimal runtime chat without UI or Agent dependencies
 - Repository guides for provider configuration, MCP setup and troubleshooting
 - Source-based maintenance review with prioritized fixes and verification criteria
 - README logo in a rounded dark square for visibility on light and dark themes

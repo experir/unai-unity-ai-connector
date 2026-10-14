@@ -61,7 +61,7 @@ graph TB
     style runtime fill:transparent,stroke:#00BD00,stroke-width:2px
 ```
 
-> **Modular assemblies** — Editor Assistant and MCP discover each other via reflection. Both depend on Agent, and Agent depends on Core. When removing Agent, also remove its dependents and `Examples/`. MCP needs Editor Assistant for the built-in editor tools. See [Modular Structure](#modular-structure).
+> **Modular assemblies** — Editor Assistant and MCP discover each other via reflection. Both depend on Agent, and Agent depends on Core. When removing Agent, also remove its dependents and any imported agent samples. MCP needs Editor Assistant for the built-in editor tools. See [Modular Structure](#modular-structure).
 
 ## Why One Package Instead of Many?
 
@@ -138,7 +138,9 @@ https://github.com/experir/unai-unity-ai-connector.git
 
 Clone this repo into your project's `Packages` directory (e.g. `Packages/com.unai.universal-ai-connector`).
 
-The bundled `Examples/` assembly references Agent and TextMeshPro, and its chat UI uses Unity UI. In projects without these example dependencies, use an editable local copy and remove `Examples/` together with `Examples.meta`. Packaging the examples as optional UPM samples is a planned improvement; see the [maintenance review](Docs/maintenance-review.md).
+### Optional samples
+
+Import samples from UNAI's Package Manager **Samples** section. **Minimal Runtime Chat** uses only Core. **Chat UI and Agents** requires Agent and `com.unity.ugui` 2.0.0 (Unity UI and TextMeshPro). Samples stay in `Samples~` until explicitly imported, so a clean package installation has no UI dependency.
 
 ### Installing Newtonsoft JSON
 
@@ -407,14 +409,14 @@ Four functional modules with separate assemblies. Keep their required dependenci
 
 | You want... | Keep these folders | Delete these |
 |---|---|---|
-| Just chat API in your game | `Runtime/`, `Editor/` | `Agent/`, `EditorAssistant/`, `MCP/`, root `Examples/` |
+| Just chat API in your game | `Runtime/`, `Editor/` | `Agent/`, `EditorAssistant/`, `MCP/` |
 | Runtime agents with tools | `Runtime/`, `Agent/`, `Editor/` | `EditorAssistant/`, `MCP/` |
 | Editor assistant only | `Runtime/`, `Agent/`, `EditorAssistant/`, `Editor/` | `MCP/` |
 | MCP with built-in editor tools | `Runtime/`, `Agent/`, `MCP/`, `EditorAssistant/`, `Editor/` | Nothing required |
 | MCP with your own tool registry | `Runtime/`, `Agent/`, `MCP/`, `Editor/` | `EditorAssistant/` (default window then has no tools) |
 | Everything | Keep all | Nothing |
 
-Paths above are relative to `Scripts/`, except the root `Examples/` folder. Examples require Agent, TextMeshPro and Unity UI. `Editor/` supplies setup utilities and has its own `UnAI.Editor` assembly.
+Paths above are relative to `Scripts/`. Imported UI samples require Agent, TextMeshPro and Unity UI; remove them too when removing their dependencies. `Editor/` supplies setup utilities and has its own `UnAI.Editor` assembly.
 
 ### How modules discover each other
 

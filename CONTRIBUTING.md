@@ -18,7 +18,7 @@ Thank you for your interest in contributing to UNAI! Every contribution helps ma
    cd YourProject/Packages
    git clone https://github.com/YOUR_USERNAME/unai-unity-ai-connector.git com.unai.universal-ai-connector
    ```
-3. Open the project in Unity and let Package Manager install Newtonsoft JSON 3.2.2. The current examples require Agent, Unity UI and TextMeshPro; see [installation notes](README.md#installation).
+3. Open the project in Unity and let Package Manager install Newtonsoft JSON 3.2.2. Optional UI samples require Agent, Unity UI and TextMeshPro; see [installation notes](README.md#installation).
 4. Create a **feature branch**: `git checkout -b feat/my-feature`
 
 ## Project Structure
@@ -30,18 +30,18 @@ Scripts/
 ├── Editor/         # Editor utilities — setup wizard, Hub window, inspectors
 ├── EditorAssistant/# AI chat window with 32 Unity tools (editor only)
 ├── MCP/            # MCP server for external AI clients (editor only)
-Examples/           # Demo scenes and sample scripts
+Samples~/           # Optional UPM samples, imported through Package Manager
 Docs/               # Versioned provider, MCP, troubleshooting and maintenance guides
 ```
 
-The script modules have separate assemblies (`.asmdef`). Agent references Runtime; Editor Assistant and MCP both reference Agent and Runtime. Assistant and MCP discover each other through reflection. Examples reference Agent and TextMeshPro. Follow the [module dependency table](README.md#modular-structure) when removing modules.
+The script modules have separate assemblies (`.asmdef`). Agent references Runtime; Editor Assistant and MCP both reference Agent and Runtime. Assistant and MCP discover each other through reflection. The optional UI sample references Agent, TextMeshPro and Unity UI. Follow the [module dependency table](README.md#modular-structure) when removing modules.
 
 ## Code Guidelines
 
 - **C# conventions** — follow existing code style (PascalCase for public members, `_camelCase` for private fields)
 - **No external dependencies** — everything must work with just Unity + Newtonsoft JSON
 - **Editor vs Runtime** — if it uses `UnityEditor`, it goes in an editor-only assembly
-- **Module dependencies** — avoid hard references between Assistant and MCP; verify removal together with dependent assemblies, including Examples
+- **Module dependencies** — avoid hard references between Assistant and MCP; verify removal together with dependent assemblies, including imported samples
 - **XML docs** — add `<summary>` comments to public APIs
 - **No `Debug.Log` spam** — use `[UNAI]` prefix for log messages, keep them minimal
 

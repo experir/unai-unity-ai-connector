@@ -4,7 +4,8 @@
     "references": [
         "UnAI.Runtime",
         "UnAI.Agent",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Unity.ugui"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

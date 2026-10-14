@@ -78,7 +78,9 @@ Reviewed on **2026-10-14** against local commit `41f2a0e` (2026-02-24), package 
 
 ### 8. Package examples as optional UPM samples
 
-**Evidence:** [package.json](../package.json) has an empty `samples` list, while [UnAI.Examples.asmdef](../Examples/UnAI.Examples.asmdef) references `UnAI.Agent` and `Unity.TextMeshPro`. Example scripts also use Unity UI. Removing Agent alone leaves an unresolved assembly reference.
+**Implemented:** examples now live in `Samples~`, with separate minimal chat and UI/agent samples declared in `package.json`. UI assembly references and dependencies are explicit.
+
+**Evidence:** [package.json](../package.json) has an empty `samples` list, while [UnAI.Examples.asmdef](../Samples~/ChatAndAgents/UnAI.Examples.asmdef) references `UnAI.Agent` and `Unity.TextMeshPro`. Example scripts also use Unity UI. Removing Agent alone leaves an unresolved assembly reference.
 
 **Proposed fix:** move examples into `Samples~`, declare them in `package.json`, document their UI dependencies, and separate chat-only from agent samples. Include a minimal runtime example that does not require a UI package. Verify package installation in a clean Unity project and resolve UI assembly references explicitly.
 
