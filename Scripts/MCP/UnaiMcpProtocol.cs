@@ -64,6 +64,9 @@ namespace UnAI.MCP
                     "ping" => MakeResult(id, new JObject()),
                     "tools/list" => HandleToolsList(id, tools, allowMutatingTools),
                     "tools/call" => await HandleToolsCall(id, parameters, tools, ct, allowMutatingTools),
+                    "resources/list" => HandleResourcesList(id),
+                    "resources/templates/list" => MakeResult(id, new JObject { ["resourceTemplates"] = new JArray() }),
+                    "resources/read" => await HandleResourcesRead(id, parameters, ct),
                     _ => MakeError(id, -32601, $"Method not found: {method}")
                 };
             }
@@ -105,6 +108,11 @@ namespace UnAI.MCP
                 {
                     ["tools"] = new JObject
                     {
+                        ["listChanged"] = false
+                    },
+                    ["resources"] = new JObject
+                    {
+                        ["subscribe"] = false,
                         ["listChanged"] = false
                     }
                 },
@@ -193,6 +201,42 @@ namespace UnAI.MCP
                 Debug.Log($"[UNAI MCP] Tool '{toolName}' completed successfully.");
 
             return MakeResult(id, result);
+        }
+
+        private static string HandleResourcesList(JToken id)
+        {
+            var list = new JArray();
+            foreach (var resource in UnaiMcpResources.All)
+            {
+                list.Add(new JObject
+                {
+                    ["uri"] = resource.Uri,
+                    ["name"] = resource.Name ?? resource.Uri,
+                    ["description"] = resource.Description ?? "",
+                    ["mimeType"] = resource.MimeType ?? "text/plain"
+                });
+            }
+            return MakeResult(id, new JObject { ["resources"] = list });
+        }
+
+        private static async Task<string> HandleResourcesRead(JToken id, JObject parameters, CancellationToken ct)
+        {
+            if (parameters["uri"]?.Type != JTokenType.String)
+                return MakeError(id, -32602, "Missing required parameter: 'uri'");
+            string uri = parameters["uri"].ToString();
+            var resource = UnaiMcpResources.Find(uri);
+            if (resource == null)
+                return MakeError(id, -32002, $"Resource not found: '{uri}'. Use resources/list to see available resources.");
+
+            string text = await resource.Read(ct);
+            Debug.Log($"[UNAI MCP] Read resource '{uri}'.");
+            return MakeResult(id, new JObject
+            {
+                ["contents"] = new JArray
+                {
+                    new JObject { ["uri"] = uri, ["mimeType"] = resource.MimeType ?? "text/plain", ["text"] = text ?? "" }
+                }
+            });
         }
 
         private static string MakeResult(JToken id, JObject result)

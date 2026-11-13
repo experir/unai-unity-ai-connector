@@ -31,6 +31,31 @@ Implementing `IUnaiTool` does not automatically register a tool in every context
 
 Tools run on Unity's main thread. The default read-only catalog contains scene/object inspection, selection, script reading, asset listing/search and project settings. Tools with side effects are hidden and rejected unless mutating tools are enabled. Custom tools default to mutating; set `Definition.IsReadOnly = true` only when all their operations have no side effects.
 
+## Resources
+
+Besides tools, the server exposes read-only **resources**, Unity context that clients can attach to a conversation (in Claude Code, type `@` and pick one). They are available even when mutating tools are disabled.
+
+| URI | Content |
+|-----|---------|
+| `unity://project/info` | Unity version, product, build target, render pipeline, open scenes and scenes in the build |
+| `unity://scene/hierarchy` | Every GameObject in the open scenes (and the prefab being edited), indented by parent, with components |
+| `unity://selection` | The selected objects, with transform details for GameObjects |
+| `unity://console/recent` | The last 200 Console messages since the Editor loaded |
+
+Add your own with `UnaiMcpResources.Register`:
+
+```csharp
+UnaiMcpResources.Register(new UnaiMcpResource
+{
+    Uri = "game://design/notes",
+    Name = "Level design notes",
+    MimeType = "text/markdown",
+    Read = ct => Task.FromResult(File.ReadAllText("Docs/level-notes.md"))
+});
+```
+
+`Read` runs on the Unity main thread. Resource subscriptions and URI templates are not supported.
+
 ## Current protocol limitations
 
 The implementation negotiates MCP `2025-11-25` or `2025-06-18`. POST requests return JSON; accepted notifications and responses return HTTP 202 with no body. A JSON-only Streamable HTTP server may return HTTP 405 for GET, which this server does. Legacy HTTP+SSE transport and JSON-RPC batch requests are not supported.
