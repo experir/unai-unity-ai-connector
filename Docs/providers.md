@@ -37,6 +37,22 @@ Live checks on 2026-10-14 passed with Ollama 0.17.1 and `qwen3:0.6b` on Unity 60
 
 `localhost` refers to the device running Unity. A mobile build cannot reach your development computer through `localhost`; use a reachable server address and configure the network accordingly.
 
+### Starting the local server automatically
+
+If a request finds the local server off, UnAI starts it and sends the request once it answers. It never downloads models or software: the server and the model must already be installed.
+
+| Provider | Default start command | Notes |
+|----------|----------------------|-------|
+| Ollama | `ollama serve` | Found on `PATH` or in the default install folders |
+| LM Studio | `lms server start` | Uses the `lms` command-line tool that ships with LM Studio |
+| llama.cpp | none | Set **Server Start Command**, for example `llama-server -m C:/models/model.gguf --port 8080` |
+
+- Each local provider has **Auto Start Server** (on by default) and **Server Start Command** (empty uses the default above) in the config.
+- It only applies when the base URL is on this machine (`localhost` or `127.0.0.1`), in the Editor and in Windows, macOS and Linux players. Mobile and WebGL builds can't start programs.
+- The check runs before chat, streaming and agent requests, and is remembered for 10 seconds. A started server keeps running after Unity closes, like when you start it yourself.
+- If the server can't be started, the request fails right away with a `LocalServerUnavailable` error that says why, instead of retrying. With fallback providers configured, `UnaiManager` moves on to the next one.
+- Call `UnaiLocalServer.EnsureRunningAsync(config)` to wake the server earlier, for example on a loading screen, so the first reply isn't delayed.
+
 ## Capabilities in this implementation
 
 | Provider adapter | Native tool payloads | JSON output behavior |

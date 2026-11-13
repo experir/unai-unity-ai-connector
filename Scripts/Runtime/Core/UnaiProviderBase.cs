@@ -103,6 +103,9 @@ namespace UnAI.Core
             request.Stream = false;
             ResolveModel(request);
 
+            var serverError = await UnaiLocalServer.EnsureRunningAsync(Config, cancellationToken);
+            if (serverError != null) throw new UnaiRequestException(serverError);
+
             string url = BuildRequestUrl(request);
             string body = SerializeRequest(request);
             var headers = BuildHeaders();
@@ -136,6 +139,13 @@ namespace UnAI.Core
             request = request.Clone();
             request.Stream = true;
             ResolveModel(request);
+
+            var serverError = await UnaiLocalServer.EnsureRunningAsync(Config, cancellationToken);
+            if (serverError != null)
+            {
+                onError?.Invoke(serverError);
+                return;
+            }
 
             string url = BuildRequestUrl(request);
             string body = SerializeRequest(request);

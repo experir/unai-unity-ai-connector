@@ -35,6 +35,12 @@ namespace UnAI.Config
         [Tooltip("Request streaming usage on OpenAI-compatible servers. OpenAI itself always requests usage.")]
         public bool IncludeStreamingUsage;
 
+        [Tooltip("Local servers (Ollama, LM Studio, llama.cpp) on this machine: start the server when a request finds it off. Editor and desktop builds only.")]
+        public bool AutoStartServer = true;
+        [Tooltip("Command that starts the local server. Empty uses the default: 'ollama serve' for Ollama, 'lms server start' for LM Studio. " +
+                 "llama.cpp needs one, e.g. llama-server -m C:/models/model.gguf --port 8080")]
+        public string ServerStartCommand;
+
         [Tooltip("Custom headers to include with every request.")]
         public SerializableKeyValuePair[] CustomHeaders;
 

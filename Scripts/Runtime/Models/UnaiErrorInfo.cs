@@ -11,7 +11,9 @@ namespace UnAI.Models
         ServerError,
         Cancelled,
         StreamingError,
-        Unknown
+        Unknown,
+        /// <summary>A local model server (Ollama, LM Studio, llama.cpp) is off and could not be started.</summary>
+        LocalServerUnavailable
     }
 
     [System.Serializable]
@@ -35,7 +37,9 @@ namespace UnAI.Models
         public bool IsRetryable =>
             ErrorType == UnaiErrorType.RateLimit ||
             ErrorType == UnaiErrorType.ServerError ||
-            ErrorType == UnaiErrorType.Network;
+            ErrorType == UnaiErrorType.Network ||
+            // Lets the manager fall back to another provider; never replayed against the same server.
+            ErrorType == UnaiErrorType.LocalServerUnavailable;
 
         /// <summary>
         /// Returns a human-readable explanation of the error suitable for display to
@@ -63,6 +67,9 @@ namespace UnAI.Models
                     UnaiErrorType.ServerError =>
                         $"{provider} server error (HTTP {HttpStatusCode}). The provider is experiencing " +
                         $"issues. This is usually temporary — try again in a moment.",
+                    UnaiErrorType.Network when UnAI.Core.UnaiLocalServer.IsLocalProvider(ProviderId) =>
+                        $"Could not reach {provider}. Make sure the local server is running, or turn on " +
+                        $"Auto Start Server for {provider} in the UnAI configuration (Window > UnAI > Hub).",
                     UnaiErrorType.Network =>
                         $"Network error: could not reach {provider}. Check your internet connection " +
                         $"and ensure the API endpoint URL is correct in UnAI settings.",

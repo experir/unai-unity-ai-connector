@@ -42,6 +42,11 @@ namespace UnAI.Editor
                     DrawField(ref y, position, property, "EnableToolCalling", lineHeight);
                     DrawField(ref y, position, property, "EnableJsonSchema", lineHeight);
                     DrawField(ref y, position, property, "IncludeStreamingUsage", lineHeight);
+                    if (IsLocal(property))
+                    {
+                        DrawField(ref y, position, property, "AutoStartServer", lineHeight);
+                        DrawField(ref y, position, property, "ServerStartCommand", lineHeight);
+                    }
                     DrawField(ref y, position, property, "CustomHeaders", lineHeight);
                 }
 
@@ -61,6 +66,9 @@ namespace UnAI.Editor
                 y += height + 2;
             }
         }
+
+        private static bool IsLocal(SerializedProperty property) =>
+            UnAI.Core.UnaiLocalServer.IsLocalProvider(property.FindPropertyRelative("ProviderId")?.stringValue);
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -82,6 +90,8 @@ namespace UnAI.Editor
                 height += lineHeight; // TimeoutSeconds
                 height += lineHeight; // MaxRetries
                 height += lineHeight * 3; // Capability overrides
+                if (IsLocal(property))
+                    height += lineHeight * 2; // AutoStartServer, ServerStartCommand
 
                 var customHeaders = property.FindPropertyRelative("CustomHeaders");
                 if (customHeaders != null)
