@@ -105,6 +105,9 @@ namespace UnAI.Providers.Ollama
                 obj["format"] = request.Options.JsonSchema;
             }
 
+            if (request.Options?.Reasoning is bool think)
+                obj["think"] = think;
+
             if (request.Options != null)
             {
                 var options = new JObject();

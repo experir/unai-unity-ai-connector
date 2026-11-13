@@ -78,6 +78,20 @@ namespace UnAI.Tests
             Assert.AreEqual(12, final.Usage.TotalTokens);
         }
 
+        [Test]
+        public void OllamaSendsThinkOnlyWhenReasoningIsSet()
+        {
+            var provider = Provider("ollama");
+            var request = new UnaiChatRequest { Model = "fixture", Messages = new() { UnaiChatMessage.User("hi") } };
+            Assert.IsNull(Payload(provider, request)["think"], "Unset keeps the model's default");
+
+            request.Options = new UnaiRequestOptions { Reasoning = false };
+            Assert.AreEqual(false, (bool)Payload(provider, request.Clone())["think"], "Survives the manager's clone");
+
+            request.Options.Reasoning = true;
+            Assert.AreEqual(true, (bool)Payload(provider, request)["think"]);
+        }
+
         [TestCase("not-json")]
         [TestCase("{\"error\":\"model failed\"}")]
         public void OllamaStreamFailuresDoNotAppearToCompleteSuccessfully(string line)

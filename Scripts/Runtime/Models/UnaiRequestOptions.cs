@@ -35,6 +35,14 @@ namespace UnAI.Models
         [JsonProperty("jsonSchema")]
         public JObject JsonSchema { get; set; }
 
+        /// <summary>
+        /// Whether a reasoning ("thinking") model should reason before answering. Null keeps the model's default.
+        /// Set false for fast, conversational replies: reasoning can add thousands of hidden tokens.
+        /// Currently applied by Ollama (<c>think</c>); other providers ignore it.
+        /// </summary>
+        [JsonProperty("reasoning")]
+        public bool? Reasoning { get; set; }
+
         [JsonProperty("extraParameters")]
         public Dictionary<string, object> ExtraParameters { get; set; }
     }
