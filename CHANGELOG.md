@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-beta.2] - 2026-11-13
+
+Beta prerelease: new samples, local server auto-start, MCP resources and an agent HTTP API. Tested on Unity 6000.6.8f1 / Windows; **Unity 6000.0 remains unverified**. See [upgrade notes](Docs/upgrading.md).
+
+### Added
+- NPC Dialogue sample: talkable NPCs with personas, memory and streaming, plus a shop NPC that sells items through agent tools
+- In-Game Chat UI sample: chat window with message bubbles, streaming replies, Stop and New chat (Core only)
+- Editor Assistant Playground sample: empty scene with instructions and example prompts for the Editor Assistant and MCP server
+- Samples pick the UI input module matching the project (Input System package or Input Manager) and render in Built-in, URP and HDRP
+- Chat, NPC and Chat UI and Agents samples render emojis with the system color emoji font (Windows, macOS/iOS, Android) and remove them where none is available
+- `Tools~/build_sample_scenes.py` regenerates the sample scenes in batch mode
+- `UnaiRequestOptions.Reasoning` turns model reasoning on or off; Ollama sends it as `think`. Thinking models such as qwen3 answer up to ~100x faster with it off
+- MCP resources: `unity://project/info`, `unity://scene/hierarchy`, `unity://selection` and `unity://console/recent`, plus `UnaiMcpResources.Register` for your own. Idea from PR #1 by jojo-WJ
+- Agent HTTP API (`UnaiAgentHttpComponent`): other apps on the same computer can chat with a UnaiAgent in the Editor or a desktop build. Localhost only, bearer token, per-session memory. Idea from PR #1 by jojo-WJ
+- Local servers start automatically: when Ollama, LM Studio or llama.cpp is off, requests start it (Editor and desktop builds) and wait until it answers. Configure with Auto Start Server and Server Start Command; nothing is downloaded
+
+### Fixed
+- Replaced deprecated `FindFirstObjectByType` in `UnaiManager` (warning on Unity 6.3+)
+- Network errors from local providers now say to start the local server instead of checking the internet connection
+
 ## [1.1.0-beta.1] - 2026-10-14
 
 Beta prerelease with **Unity 6000.0 explicitly unverified**. See [upgrade instructions](Docs/upgrading.md), [validation coverage](Docs/validation.md) and [browser checks](Docs/browser-validation.md) before adopting it.

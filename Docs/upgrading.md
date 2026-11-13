@@ -1,6 +1,17 @@
-# Upgrading from 1.0.0 to 1.1.0-beta.1
+# Upgrading
 
 [Back to README](../README.md)
+
+## From 1.1.0-beta.1 to 1.1.0-beta.2
+
+No breaking changes. Things to know:
+
+- **Local servers start automatically.** When Ollama, LM Studio or llama.cpp on `localhost` is off, requests now start it (Editor and desktop builds) instead of failing. Turn off **Auto Start Server** on the provider in your `UnaiGlobalConfig` to keep the old behaviour. See [starting the local server automatically](providers.md#starting-the-local-server-automatically).
+- A local server that can't be started fails right away with the new `UnaiErrorType.LocalServerUnavailable` instead of retrying. It counts as retryable, so `UnaiManager` falls back to the next provider when fallbacks are configured.
+- New samples: NPC Dialogue, In-Game Chat UI and Editor Assistant Playground. Import them from Package Manager.
+- Pin this version with `https://github.com/experir/unai-unity-ai-connector.git#v1.1.0-beta.2`.
+
+## From 1.0.0 to 1.1.0-beta.1
 
 This guide covers **1.1.0-beta.1**, a [beta prerelease](https://github.com/experir/unai-unity-ai-connector/releases/tag/v1.1.0-beta.1) for evaluation in a copy of your Unity project. Unity 6000.3.23f1 on Windows and Chrome browser checks have passed; **Unity 6000.0 is unverified**. See the [validation matrix](validation.md), [browser checks](browser-validation.md) and [changelog](../CHANGELOG.md).
 

@@ -140,7 +140,15 @@ Clone this repo into your project's `Packages` directory (e.g. `Packages/com.una
 
 ### Optional samples
 
-Import samples from UNAI's Package Manager **Samples** section. **Minimal Runtime Chat** uses only Core. **Chat UI and Agents** requires Agent and `com.unity.ugui` 2.0.0 (Unity UI and TextMeshPro). Samples stay in `Samples~` until explicitly imported, so a clean package installation has no UI dependency.
+Import samples from UNAI's Package Manager **Samples** section. Samples stay in `Samples~` until explicitly imported, so a clean package installation has no UI dependency. UI samples need `com.unity.ugui` 2.0.0 or newer (Unity UI and TextMeshPro).
+
+| Sample | What it shows | Modules |
+|--------|---------------|---------|
+| **NPC Dialogue** | Click villagers to talk: personas, memory, streaming, and a shop NPC that sells items through agent tools | Core, Agent |
+| **In-Game Chat UI** | Ready-to-use chat window with bubbles, streaming, Stop and New chat | Core |
+| **Editor Assistant Playground** | Empty scene with instructions and example prompts for the Editor Assistant and MCP server | Editor Assistant |
+| **Minimal Runtime Chat** | One request printed to the Console, no UI | Core |
+| **Chat UI and Agents** | Developer test panel: provider switching, response formats, token stats, agent tools | Core, Agent |
 
 ### Installing Newtonsoft JSON
 
@@ -336,6 +344,21 @@ conversation.AddAssistant(response.Content);
 // Conversation remembers full history, truncates oldest when needed
 ```
 
+### Agent HTTP API
+
+Let other apps on the same computer chat with a UNAI agent running in the Editor or in a desktop build, for example a companion app, a test harness or your own tools. Add **UnAI > Agent HTTP API** (`UnaiAgentHttpComponent`) to a GameObject, register the tools the agent may use, and send requests with the token:
+
+```csharp
+GetComponent<UnaiAgentHttpComponent>().Tools.Register(new MyWeatherTool());
+```
+
+```sh
+curl -X POST http://localhost:3390/agent/chat -H "Authorization: Bearer <token>" -d '{"message": "What is the weather?", "session": "player-1"}'
+# {"session":"player-1","reply":"...","toolCalls":[{"name":"get_weather","arguments":{...},"result":"..."}]}
+```
+
+Endpoints: `GET /health`, `POST /agent/chat` (`message`, optional `session`), `POST /agent/reset` (optional `session`). Each session keeps its own memory. The server listens on `localhost` only, requires the bearer token (set one in the Inspector or read `AccessToken` after it starts) and refuses requests from web pages. It is not available on mobile or WebGL.
+
 ## Editor AI Assistant
 
 Open **Window > UnAI > AI Assistant** to get a chat-powered assistant directly in the Unity Editor.
@@ -465,7 +488,7 @@ This table describes the implementation, not a tested compatibility matrix. See 
 
 Documentation lives in this repository and is versioned with the package.
 
-The refresh is **1.1.0-beta.1**, a [beta prerelease](https://github.com/experir/unai-unity-ai-connector/releases/tag/v1.1.0-beta.1). Unity 6000.3.23f1 and Chrome/Windows browser checks pass; **Unity 6000.0 remains unverified**. Existing users should follow the [upgrade instructions](Docs/upgrading.md), particularly for samples and MCP authentication.
+The current version is **1.1.0-beta.2**, a [beta prerelease](https://github.com/experir/unai-unity-ai-connector/releases/tag/v1.1.0-beta.2). Unity 6000.6.8f1 and 6000.3.23f1 checks pass on Windows; **Unity 6000.0 remains unverified**. Existing users should follow the [upgrade instructions](Docs/upgrading.md), particularly for samples and MCP authentication.
 
 | Guide | Description |
 |-------|-------------|
