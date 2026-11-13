@@ -49,6 +49,7 @@ namespace UnAI.Examples
 
         private void Start()
         {
+            UnaiEmojiText.EnableEmoji();
             EnsureManager();
 
             if (UnaiManager.Instance == null || UnaiManager.Instance.Config == null)
@@ -221,7 +222,7 @@ namespace UnAI.Examples
                         request,
                         onDelta: delta =>
                         {
-                            _responseText.text = delta.AccumulatedContent;
+                            _responseText.text = UnaiEmojiText.PrepareText(delta.AccumulatedContent);
                             _statusText.text = $"Streaming... {delta.AccumulatedContent.Length} chars";
                             ScrollToBottom(_responseScroll);
                         },
@@ -234,7 +235,7 @@ namespace UnAI.Examples
                         {
                             _statusText.text = $"ERROR [{error.ErrorType}]: {error.Message}";
                             if (!string.IsNullOrEmpty(error.RawResponse))
-                                _responseText.text = error.RawResponse;
+                                _responseText.text = UnaiEmojiText.PrepareText(error.RawResponse);
                             Log(_statusText.text);
                         },
                         ct: _cts.Token);
@@ -244,7 +245,7 @@ namespace UnAI.Examples
                     _statusText.text = "Waiting for response...";
 
                     var response = await UnaiManager.Instance.ChatAsync(request, _cts.Token);
-                    _responseText.text = response.Content;
+                    _responseText.text = UnaiEmojiText.PrepareText(response.Content);
                     _statusText.text = FormatResult(Time.realtimeSinceStartup - startTime, response);
                     Log(_statusText.text);
                     ScrollToBottom(_responseScroll);
@@ -253,7 +254,7 @@ namespace UnAI.Examples
             catch (UnaiRequestException ex)
             {
                 _statusText.text = $"ERROR [{ex.ErrorInfo.ErrorType}]: {ex.Message}";
-                _responseText.text = ex.ErrorInfo.RawResponse ?? ex.Message;
+                _responseText.text = UnaiEmojiText.PrepareText(ex.ErrorInfo.RawResponse ?? ex.Message);
                 Log(_statusText.text);
             }
             catch (OperationCanceledException)

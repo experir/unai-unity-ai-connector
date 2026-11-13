@@ -1,0 +1,23 @@
+{
+    "name": "UnAI.Sample.NpcDialogue",
+    "rootNamespace": "UnAI.Samples.NpcDialogue",
+    "references": [
+        "UnAI.Runtime",
+        "UnAI.Agent",
+        "Unity.TextMeshPro",
+        "Unity.ugui",
+        "Unity.InputSystem"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": true,
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "UNAI_INPUT_SYSTEM"
+        }
+    ]
+}

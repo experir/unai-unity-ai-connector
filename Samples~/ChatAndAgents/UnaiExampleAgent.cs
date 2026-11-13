@@ -38,6 +38,7 @@ namespace UnAI.Examples
 
         private void Start()
         {
+            UnaiEmojiText.EnableEmoji();
             SetupManager();
             SetupAgent();
             SetupButtons();
@@ -161,7 +162,7 @@ namespace UnAI.Examples
 
         private void AppendOutput(string text)
         {
-            _outputText.text += text + "\n";
+            _outputText.text += UnaiEmojiText.PrepareText(text) + "\n";
             if (_scrollRect != null)
             {
                 Canvas.ForceUpdateCanvases();

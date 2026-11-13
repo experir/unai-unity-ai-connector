@@ -1,0 +1,6 @@
+{
+    "name": "UnAI.Sample.EditorAssistantPlayground",
+    "rootNamespace": "UnAI.Samples.EditorAssistantPlayground",
+    "references": [],
+    "autoReferenced": true
+}
