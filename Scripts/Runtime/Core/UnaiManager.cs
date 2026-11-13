@@ -71,7 +71,7 @@ namespace UnAI.Core
         private static void RestoreExistingManager()
         {
             // With scene and domain reload disabled, an existing component may not receive Awake again.
-            var manager = FindFirstObjectByType<UnaiManager>();
+            var manager = FindAnyObjectByType<UnaiManager>();
             if (manager == null) return;
             Instance = manager;
             if (manager._config != null) manager.Initialize(manager._config);
